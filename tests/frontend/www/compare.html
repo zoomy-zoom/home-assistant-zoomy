@@ -1,0 +1,70 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Zoomy: original pages against the new cards</title>
+<!-- Test harness only, never shipped. Each job runs twice with the same made-up data and the same steps: once the
+     ORIGINAL HOME-styled page (old-host.html, the page from ZOOMY_ORIGINALS in an iframe under a fake Home Assistant
+     with the old sensors and zoomy_store/... answers), once the new card (new-host.html). run.js compares what
+     both show. Results as base64 JSON in <pre id="out">. -->
+<style> body { margin: 0; } iframe { display: block; border: 0; } </style>
+</head>
+<body>
+<pre id="out">running</pre>
+<div id="frames"></div>
+<script>
+(function () {
+  'use strict';
+  var q = new URLSearchParams(location.search), v = q.get('v') || '0.1.0';
+  var NOW = Math.floor(Date.now() / 60000) * 60000;
+  var start = [['wait', 4000], ['snap', 'start']];
+  var JOBS = [
+    { id: 'trips', old: 'charts.html#trips', card: 'trips', steps: start.concat([['click', 'button[data-p]', 1], ['wait', 600], ['snap', 'a month'],
+      ['click', 'button[data-p="all"]'], ['wait', 600], ['snap', 'all'], ['bar', 0, 2], ['bar', 3, 1], ['wait', 300], ['snap', 'bars tapped'],
+      ['click', 'button[data-p="30"]'], ['wait', 600], ['bar', 1, 4], ['wait', 300], ['snap', 'last 30 days, bar tapped']]) },
+    { id: 'charges', old: 'charts.html#charges', card: 'charges', steps: start.concat([['click', 'button[data-p]', 2], ['wait', 600], ['snap', 'a month'],
+      ['click', 'button[data-p="all"]'], ['wait', 600], ['snap', 'all'], ['bar', 0, 1], ['bar', 1, 3], ['wait', 300], ['snap', 'bars tapped']]) },
+    { id: 'trips, phone', old: 'charts.html#trips', card: 'trips', w: 390, h: 844, steps: start.concat([['click', 'button[data-p="all"]'], ['wait', 600], ['snap', 'all']]) },
+    { id: 'performance', old: 'dyno.html', card: 'dyno', steps: start.concat([
+      ['point', '#holder', 0.6], ['wait', 200], ['snap', 'pointed'], ['click', '#filters button[data-m="Eco"]'], ['wait', 400], ['snap', 'Eco only'],
+      ['click', '#filters button[data-m=""]'], ['click', '#cmp'], ['wait', 200], ['click', '#list button', 4], ['wait', 400], ['snap', 'compare'],
+      ['click', '#runs button[data-sort="q"]'], ['wait', 200], ['snap', 'runs by 400 m']]) },
+    { id: 'performance, phone', old: 'dyno.html', card: 'dyno', w: 390, h: 844, steps: start.concat([['point', '#holder', 0.45], ['wait', 200], ['snap', 'pointed']]) },
+    { id: 'charge sheet', old: 'charge.html', card: 'charge', steps: start.concat([['point', '#plot', 0.6], ['wait', 200], ['snap', 'pointed'],
+      ['click', '#list button', 3], ['wait', 1000], ['snap', 'another charge'], ['click', '#list button', 0], ['wait', 1000], ['snap', 'the short one'],
+      ['point', '#plot', 0.3], ['wait', 200], ['snap', 'short one, pointed']]) },
+    { id: 'charge sheet, phone', old: 'charge.html', card: 'charge', w: 390, h: 844, steps: start.concat([['click', '#list button', 4], ['wait', 1000], ['snap', 'another charge']]) }
+  ];
+  var box = document.getElementById('frames'), out = [];
+  function frame(src, w, h) {
+    var f = document.createElement('iframe');
+    f.style.width = w + 'px'; f.style.height = h + 'px';
+    f.src = src;
+    box.appendChild(f);
+    return f;
+  }
+  function next(i) {
+    if (i >= JOBS.length) {
+      document.getElementById('out').textContent = btoa(unescape(encodeURIComponent(JSON.stringify({ jobs: out }))));
+      return;
+    }
+    var j = JOBS[i], w = j.w || 1280, h = j.h || 900, steps = encodeURIComponent(JSON.stringify(j.steps));
+    var fo = frame('old-host.html?page=' + encodeURIComponent(j.old) + '&now=' + NOW + '&steps=' + steps, w, h);
+    var fn = frame('new-host.html?card=' + j.card + '&v=' + encodeURIComponent(v) + '&now=' + NOW + '&steps=' + steps, w, h);
+    var begun = Date.now();
+    (function wait() {
+      var a = false, b = false;
+      try { a = fo.contentWindow.done === true; b = fn.contentWindow.done === true; } catch (e) { /* not yet */ }
+      if (!(a && b) && Date.now() - begun < 240000) { setTimeout(wait, 300); return; }
+      var r = { id: j.id, old: null, neu: null, why: (a ? '' : 'old did not finish ') + (b ? '' : 'new did not finish') };
+      try { r.old = fo.contentWindow.result; r.neu = fn.contentWindow.result; } catch (e) { r.why += e.message; }
+      out.push(JSON.parse(JSON.stringify(r)));
+      fo.remove(); fn.remove();
+      next(i + 1);
+    })();
+  }
+  next(0);
+})();
+</script>
+</body>
+</html>

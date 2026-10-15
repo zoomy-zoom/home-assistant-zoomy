@@ -29,11 +29,24 @@ Add as many cars as you like. If the Zoomy app ever makes a new webhook id, use
   distance, duration, energy, regen, consumption, battery levels, outside temperature,
   charge cost and price, off-peak share, charger, battery health and more. They work in
   automations and history like any other sensor.
-* **The ZOOMY dashboard** in the sidebar, added the first time you add a car: Summary,
-  Trips, Charges, Trip map, Dyno and Charge sheet. It updates itself when Zoomy is updated.
-  You can rename it, hide it, delete it or take control and change it like any dashboard.
+* **The ZOOMY dashboard** in the sidebar, added the first time you add a car. Six tabs:
+
+  | Tab | What it shows |
+  |---|---|
+  | Summary | Last trip, last charge, this month, last month and the battery |
+  | Trips | Every trip: totals, charts and a full table, for the last 30 days, a month or all |
+  | Charges | Every charge, the same way, with cost and off-peak share |
+  | Trip map | A trip's route on the map, from the car's own GPS route |
+  | Performance | Power at each speed (dyno pulls), timed runs and battery health |
+  | Charge sheet | One charge minute by minute: charging power and battery level |
+
+  With two or more cars, each tab has a car picker. The dashboard updates itself when Zoomy is
+  updated. You can rename it, hide it, delete it or take control and change it like any dashboard.
   If you delete it, it is not added again. If it could not be added, Repairs tells you how
   to add it (Settings > Dashboards > Add dashboard > Zoomy).
+* **Six cards** for your own dashboards (search "Zoomy" in the card picker). Options:
+  `entry_id` (one car only), `map_view` (summary: the tab its map button opens),
+  `list_side: left` (trip map). See `custom_components/zoomy/frontend/README.md`.
 
 ## Privacy
 
@@ -46,6 +59,8 @@ Add as many cars as you like. If the Zoomy app ever makes a new webhook id, use
 * **One click turns routes off.** On the car's entry choose **Configure**: turn off
   **Keep GPS routes** to throw away every route the car sends (on by default), and tick
   **Delete the stored routes now** to remove the ones already kept.
+* The dashboard reads routes over Home Assistant's signed-in connection, one trip at a time, and keeps
+  them only on the screen. It logs nothing and keeps nothing in the browser but the car you picked.
 * The webhook only answers the home network. The car posts plain HTTP on your Wi-Fi only.
 * **Download diagnostics** has no webhook id, car name, route, trip time or trip value in it.
 * Home Assistant's own web server writes webhook addresses to its log when debug logging
@@ -135,6 +150,11 @@ custom_components/zoomy/
 Tests: `pip install -r requirements_test.txt` in a virtual environment, then `python run_tests.py`. The pure tests also run with plain Python:
 `python -m unittest discover -s tests/pure -t .`
 
+Frontend tests (Node 20 or later; the browser tests need Chrome or Chromium, always run headless with a fresh profile):
+
+* `node --test tests/frontend/unit.test.mjs`
+* `node tests/frontend/run.js` (cases and layout; add `shots` for screenshots in `tests/frontend/shots/`)
+
 ### Home Assistant APIs this relies on (checked against 2026.10.0)
 
 | What | Where |
@@ -142,7 +162,15 @@ Tests: `pip install -r requirements_test.txt` in a virtual environment, then `py
 | `webhook.async_register(..., local_only=True, allowed_methods=["POST"])`; unknown id or non-local sender gets a bare 200 | `homeassistant/components/webhook/__init__.py:54-95, 164-174, 190-207` |
 | Serving a folder: `hass.http.async_register_static_paths([StaticPathConfig(url, path, cache_headers=True)])` (31-day cache) | `components/http/server.py:77-82, 367`; `components/http/static.py:13-15` |
 | Loading a module on every page: `frontend.add_extra_js_url` | `components/frontend/__init__.py:427-433` |
-| Custom dashboard strategy `custom:zoomy` = element `ll-strategy-dashboard-zoomy`; `window.customStrategies` | frontend `20260930.2`: `src/panels/lovelace/strategies/get-strategy.ts:31, 107-114`; `src/data/lovelace_custom_strategies.ts` |
+| Custom dashboard strategy `custom:zoomy` = element `ll-strategy-dashboard-zoomy` (waited for up to 5 s); `window.customStrategies` | frontend `20260930.3`: `src/panels/lovelace/strategies/get-strategy.ts:30-31, 100-116, 133-150`; `src/data/lovelace_custom_strategies.ts:3-25` |
+| Strategy class: static `generate(config, hass)`, `registryDependencies` (default: entities, devices, areas, floors), `getCreateSuggestions` | `src/panels/lovelace/strategies/types.ts:13-19, 29-35`; `get-strategy.ts:282-308, 349-358`; `src/data/lovelace/dashboard.ts:37-40` |
+| Add dashboard lists custom strategies by `type` without `custom:` | `src/panels/config/dashboard/dialog-new-dashboard.ts:111, 191, 256` |
+| Panel view: one card, `layout = "panel"`, host `height: 100%` | `src/panels/lovelace/views/hui-panel-view.ts:102-125, 127-131` |
+| Custom cards: `window.customCards` entries | `src/data/lovelace_custom_cards.ts:21-31, 67-84` |
+| `hass.formatEntityStateToParts` (money as currency parts, else value / blank / unit) | `src/types.ts:273-293`; `src/common/entity/compute_state_display.ts:29-38, 137-193` |
+| The map: `ha-map` (2026.10: no Leaflet, no `layers`; `paths`, `fitBounds`, `themeMode`; a marker at every path point; reads states and config from context) | `src/components/map/ha-map.ts:322-394, 983-1012, 1204-1300`; loaded by the map card `src/panels/lovelace/cards/hui-map-card.ts:30, 184-197`; `window.loadCardHelpers` `src/panels/lovelace/ha-panel-lovelace.ts:46` |
+| The map in 2026.9 (Leaflet, `layers`, `leafletMap`) | frontend `20260826.7` (Home Assistant 2026.9.4): `src/components/map/ha-map.ts:128-161`; same strategy tags `get-strategy.ts:111-112` |
+| Subscriptions: `connection.subscribeMessage(cb, msg, {resubscribe: false})` are dropped on a reconnect; `ready` fires after it | home-assistant-js-websocket `lib/connection.ts:138-161, 303-341, 441-458` (master 84185e8) |
 | Creating a dashboard then saving a strategy config (as Home Assistant does for its Map dashboard) | `components/lovelace/__init__.py:415-434`; collection not kept in `LovelaceData` `:109-116`, made at `:291-308`; reached via the list handler `helpers/collection.py:572, 592`; single-word url `components/lovelace/dashboard.py:289-306` |
 | Cache folder, not in backups | `core_config.py:637-645`; `components/backup/const.py:16-28` (`.cache/*`), used at `components/backup/manager.py:1913`; Supervisor `supervisor/homeassistant/module.py:62-75` (main, a2627a1) |
 | `probatio` replaces voluptuous (voluptuous is an alias) | `homeassistant/__init__.py:3-11`; `pyproject.toml:81` |

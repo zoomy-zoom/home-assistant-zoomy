@@ -2,7 +2,7 @@
 
 Choice: a storage dashboard (sidebar "ZOOMY", url /zoomy) whose WHOLE saved
 config is {"strategy": {"type": "custom:zoomy"}}.  The browser builds the
-views (Summary, Trips, Charges, Trip map, Dyno, Charge sheet) each time from
+views (Summary, Trips, Charges, Trip map, Performance, Charge sheet) each time from
 the strategy in frontend/zoomy.js, which ships with the integration, so the
 dashboard always matches the installed version; nothing stored has to be
 rewritten on an update.  It is a normal dashboard afterwards: the customer

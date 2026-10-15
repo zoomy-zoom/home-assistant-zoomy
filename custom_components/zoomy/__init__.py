@@ -13,7 +13,7 @@ signed-in websocket, and adds that dashboard once.
     pair_webhook.py   the "zoomy_pair" webhook used while pairing
     config_flow.py    Add integration > Zoomy, options, reconfigure
     websocket_api.py  zoomy/... commands for the pages
-    frontend.py       serves frontend/ (the pages and cards)   <- hook
+    frontend.py       serves frontend/ (the dashboard strategy and the cards)
     dashboard.py      the ZOOMY dashboard (strategy custom:zoomy)
 """
 

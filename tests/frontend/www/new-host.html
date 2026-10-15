@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>New card host</title>
+<!-- Test harness only, never shipped (compare group). One new Zoomy card, filling this frame, with the same made-up
+     data as the original page gets (old-host.html). ?card=&now=&steps=&v= -->
+<style> html, body { margin: 0; overflow: hidden; } </style>
+</head>
+<body>
+<div id="view"></div>
+<script src="fake-hass.js"></script>
+<script src="stubs.js"></script>
+<script src="steps.js"></script>
+<script type="module">
+  const q = new URLSearchParams(location.search);
+  const TAG = { trips: 'zoomy-trips-card', charges: 'zoomy-charges-card', dyno: 'zoomy-performance-card', charge: 'zoomy-charge-sheet-card' }[q.get('card')];
+  const fake = FakeHass.make({ now: Number(q.get('now')) });
+  const result = { snaps: [], errors: [] };
+  window.result = result;
+  window.addEventListener('error', (e) => result.errors.push('page error: ' + e.message));
+  try { localStorage.clear(); } catch (e) { /* none */ }
+  await import('/zoomy_static/' + (q.get('v') || '0.1.0') + '/zoomy.js');
+  const card = document.createElement(TAG);
+  card.setConfig({});
+  card.hass = fake.hass;
+  document.getElementById('view').appendChild(card);
+  const runner = ZoomySteps.make({
+    root: () => card.shadowRoot,
+    win: window,
+    resize: (dh) => { const fe = window.frameElement; fe.style.height = (parseFloat(fe.style.height) + dh) + 'px'; }
+  }, result);
+  runner.run(JSON.parse(q.get('steps') || '[]'), 0, () => { window.done = true; });
+</script>
+</body>
+</html>

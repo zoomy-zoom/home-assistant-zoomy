@@ -1,24 +1,19 @@
-"""Serving the ZOOMY pages and cards (the hook for the frontend files).
+"""Serving the ZOOMY dashboard and its cards (custom_components/zoomy/frontend/).
 
->>> FRONTEND HOOK (for whoever writes custom_components/zoomy/frontend/) <<<
-
-* Put every page, card and script under custom_components/zoomy/frontend/.
-* That folder is served at /zoomy_static/<integration version>/ (so each
-  new version gets fresh files and browsers may cache them for a month).
-  Reference other files relatively, e.g. import "./cards.js" or an iframe
-  src of new URL("./charts.html", import.meta.url).
+* The frontend folder is served at /zoomy_static/<integration version>/, so
+  each new version gets fresh files and browsers may cache them for a month.
+  The files import each other relatively (import "./core.js").
 * frontend/zoomy.js (const.FRONTEND_ENTRY) is loaded as a JS module on every
-  Home Assistant page.  It must define the dashboard strategy element
+  Home Assistant page.  It defines the dashboard strategy element
   "ll-strategy-dashboard-zoomy" (strategy type "custom:zoomy", see
-  dashboard.py) and the custom cards, and may push
-  {type: "zoomy", name: "Zoomy", description: "...", strategyType: "dashboard"}
-  onto window.customStrategies so "Zoomy" is offered in Settings >
-  Dashboards > Add dashboard.
-* Data comes only from the websocket commands in websocket_api.py
-  (hass.callWS({type: "zoomy/..."})).  No secrets in pages, no /local
-  files, nothing written under www.
-* Until frontend/zoomy.js exists nothing is registered (a debug line is
-  logged), so the backend works on its own.
+  dashboard.py) and the six Zoomy cards, and offers "Zoomy" in Settings >
+  Dashboards > Add dashboard (window.customStrategies).
+* The cards read only the websocket commands in websocket_api.py
+  (hass.callWS({type: "zoomy/..."})) and the integration's sensors.  No
+  secrets in the files, no /local files, nothing written under www.
+  frontend/README.md says which card asks what.
+* Without frontend/zoomy.js nothing is registered (a debug line is logged),
+  so the backend also works on its own.
 """
 
 from __future__ import annotations

@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Zoomy card layout</title>
+<!-- Test harness only, never shipped. Every Zoomy card (shot.html, made-up data) in a frame of seven widths; for
+     each: does the page scroll sideways, and does anything stick out past the right edge outside a box that scrolls
+     by itself? Results as base64 JSON in <pre id="out"> for run.js. -->
+<style> body { margin: 0; } iframe { display: block; border: 0; } </style>
+</head>
+<body>
+<pre id="out">running</pre>
+<div id="frames"></div>
+<script>
+(function () {
+  'use strict';
+  var q = new URLSearchParams(location.search), v = q.get('v') || '0.1.0';
+  var cards = ['summary', 'trips', 'charges', 'map', 'performance', 'charge-sheet'];
+  var widths = [[320, 640], [375, 812], [412, 915], [768, 1024], [1024, 768], [1366, 900], [1920, 1080]];
+  var jobs = [];
+  cards.forEach(function (c) { widths.forEach(function (w) { jobs.push({ card: c, w: w[0], h: w[1], cars: c === 'trips' ? 2 : 1 }); }); });
+  var rows = [], notes = [], box = document.getElementById('frames');
+
+  function check(job, f) {
+    var d = f.contentDocument, win = f.contentWindow, de = d.documentElement, cw = de.clientWidth, bad = [];
+    var host = d.querySelector('#view > *');
+    if (!host || !host.shadowRoot) { notes.push(job.card + ' at ' + job.w + ': no card'); return; }
+    var scrolls = function (el) {
+      // inside a box that scrolls (or clips) sideways by itself, up to the card
+      for (var p = el.parentElement || (el.parentNode && el.parentNode.host); p && p !== host; p = p.parentElement || (p.parentNode && p.parentNode.host)) {
+        var o = win.getComputedStyle(p).overflowX;
+        if (o !== 'visible') return true;
+      }
+      return false;
+    };
+    Array.prototype.forEach.call(host.shadowRoot.querySelectorAll('*'), function (el) {
+      if (el.closest('svg') && el.tagName.toLowerCase() !== 'svg') return;
+      if (/^(style|ha-map)$/i.test(el.tagName) || el.closest('ha-map')) return;
+      if (!el.checkVisibility({ visibilityProperty: true })) return;
+      var r = el.getBoundingClientRect();
+      if (!(r.width > 0 && r.height > 0)) return;
+      if (r.right <= cw + 0.5 && r.left >= -0.5) return;
+      if (scrolls(el)) return;
+      bad.push(el.tagName.toLowerCase() + (el.id ? '#' + el.id : '') + (typeof el.className === 'string' && el.className ? '.' + el.className.split(' ').join('.') : '') +
+               ' ' + Math.round(r.left) + '..' + Math.round(r.right));
+    });
+    rows.push({ card: job.card, w: job.w, scrollWidth: de.scrollWidth, sideways: de.scrollWidth > cw + 1, outside: bad.slice(0, 5) });
+  }
+  function next(i) {
+    if (i >= jobs.length) {
+      document.getElementById('out').textContent = btoa(unescape(encodeURIComponent(JSON.stringify({ rows: rows, notes: notes }))));
+      return;
+    }
+    var job = jobs[i], f = document.createElement('iframe');
+    f.style.width = job.w + 'px'; f.style.height = job.h + 'px';
+    f.src = 'shot.html?v=' + encodeURIComponent(v) + '&card=' + job.card + '&cars=' + job.cars + '&h=' + job.h;
+    box.appendChild(f);
+    setTimeout(function () {
+      try { check(job, f); } catch (e) { notes.push(job.card + ' at ' + job.w + ': ' + e.message); }
+      f.remove();
+      next(i + 1);
+    }, 6000);
+  }
+  next(0);
+})();
+</script>
+</body>
+</html>

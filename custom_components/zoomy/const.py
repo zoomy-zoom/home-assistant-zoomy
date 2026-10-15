@@ -39,7 +39,7 @@ DATA_DASHBOARD_LOCK: Final = f"{DOMAIN}_dashboard_lock"
 SIGNAL_CHANGED: Final = f"{DOMAIN}_changed_{{}}"
 
 # ---------------------------------------------------------------------------
-# Frontend (the next agent fills custom_components/zoomy/frontend/)
+# Frontend (custom_components/zoomy/frontend/, see its README.md)
 # ---------------------------------------------------------------------------
 # Every file under frontend/ is served at /zoomy_static/<version>/<file>, so a
 # new integration version always gets fresh files (long browser caching is

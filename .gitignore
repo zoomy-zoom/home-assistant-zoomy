@@ -6,3 +6,6 @@ __pycache__/
 htmlcov/
 # Home Assistant test runs
 tests/**/testing_config/
+
+# Screenshots made by tests/frontend/run.js shots
+tests/frontend/shots/

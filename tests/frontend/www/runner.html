@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Zoomy card tests</title>
+<!-- Test harness only, never shipped. ?cases=a,b,c&v=<version>&w=&h= runs each case of cases.js in its own frame
+     (its own copy of the modules, its own browser storage is shared but cleared per case at start), waits for all
+     of them, then writes the results as base64 JSON into <pre id="out"> for run.js. -->
+<style> body { margin: 0; } iframe { display: block; border: 0; } </style>
+</head>
+<body>
+<pre id="out">running</pre>
+<div id="frames"></div>
+<script>
+(function () {
+  'use strict';
+  var q = new URLSearchParams(location.search), names = (q.get('cases') || '').split(',').filter(Boolean);
+  var v = q.get('v') || '0.1.0', w = Number(q.get('w')) || 1280, h = Number(q.get('h')) || 900;
+  var box = document.getElementById('frames'), jobs = [];
+  // one after the other: they share the browser's storage (the picked car)
+  function next(i) {
+    if (i >= names.length) return finish();
+    var f = document.createElement('iframe');
+    f.style.width = w + 'px'; f.style.height = h + 'px';
+    f.src = 'case.html?case=' + encodeURIComponent(names[i]) + '&v=' + encodeURIComponent(v);
+    box.appendChild(f);
+    var job = { name: names[i], frame: f, begun: Date.now() };
+    jobs.push(job);
+    (function wait() {
+      var done = false;
+      try { done = f.contentWindow.done === true; } catch (e) { done = false; }
+      if (!done && Date.now() - job.begun < 400000) { setTimeout(wait, 250); return; }
+      try { job.result = f.contentWindow.result || null; } catch (e) { job.result = null; }
+      job.done = done;
+      f.remove();                       // its timers stop with it
+      next(i + 1);
+    })();
+  }
+  function finish() {
+    var out = jobs.map(function (j) { return { name: j.name, done: j.done, result: j.result }; });
+    document.getElementById('out').textContent = btoa(unescape(encodeURIComponent(JSON.stringify({ jobs: out }))));
+  }
+  next(0);
+})();
+</script>
+</body>
+</html>

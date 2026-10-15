@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zoomy card screenshot</title>
+<!-- Test harness only, never shipped. One Zoomy card under a stand-in for Home Assistant's bar and tabs, as a panel
+     view shows it, filled with made-up data. ?card=summary|trips|charges|map|performance|charge-sheet&cars=1|2 -->
+<style>
+  html, body { margin: 0; background: #111; font-family: system-ui, sans-serif; }
+  #bar { position: sticky; top: 0; z-index: 5; display: flex; align-items: center; gap: 22px; height: 56px; padding: 0 16px;
+         background: #101e24; color: #e1e1e1; font-size: 14px; overflow: hidden; white-space: nowrap; }
+  #bar b { font-size: 20px; font-weight: 400; margin-right: 12px; }
+  #bar span.on { border-bottom: 2px solid #03a9f4; padding-bottom: 14px; margin-top: 16px; }
+</style>
+</head>
+<body>
+<div id="bar"><b>ZOOMY</b><span>Summary</span><span>Trips</span><span>Charges</span><span>Trip map</span><span>Performance</span><span>Charge sheet</span></div>
+<div id="view"></div>
+<script src="fake-hass.js"></script>
+<script src="stubs.js"></script>
+<script type="module">
+  const q = new URLSearchParams(location.search);
+  const V = q.get('v') || '0.1.0';
+  // headless Chrome does not make a window narrower than about 500 px: the page is laid out at the asked width
+  if (q.get('w')) { document.body.style.width = q.get('w') + 'px'; document.body.style.overflow = 'hidden'; }
+  const TAG = { summary: 'zoomy-summary-card', trips: 'zoomy-trips-card', charges: 'zoomy-charges-card', map: 'zoomy-route-map-card',
+                performance: 'zoomy-performance-card', 'charge-sheet': 'zoomy-charge-sheet-card' }[q.get('card') || 'summary'];
+  const names = ['Summary', 'Trips', 'Charges', 'Trip map', 'Performance', 'Charge sheet'];
+  const tabs = document.querySelectorAll('#bar span');
+  tabs[Object.keys({ summary: 1, trips: 1, charges: 1, map: 1, performance: 1, 'charge-sheet': 1 }).indexOf(q.get('card') || 'summary')].className = 'on';
+  try { localStorage.clear(); } catch (e) { /* none */ }
+  const cars = q.get('cars') === '2'
+    ? [{ entry_id: 'entry0001', title: 'Test car', slug: 'test_car', seed: 20301001 }, { entry_id: 'entry0002', title: 'Second car', slug: 'second_car', seed: 20301002 }]
+    : undefined;
+  const fake = FakeHass.make({ cars: cars });
+  await import('/zoomy_static/' + V + '/zoomy.js');
+  const el = document.createElement(TAG);
+  el.setConfig(TAG === 'zoomy-summary-card' ? { map_view: 'map' } : {});
+  el.hass = fake.hass;
+  document.getElementById('view').appendChild(el);
+</script>
+</body>
+</html>

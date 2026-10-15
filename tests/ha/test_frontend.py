@@ -131,3 +131,23 @@ async def test_falls_back_to_a_repair_issue(hass: HomeAssistant, setup_car) -> N
     # next start it works: the issue goes away
     assert await dashboard.async_ensure_dashboard(hass) == "added"
     assert ir.async_get(hass).async_get_issue(DOMAIN, ISSUE_DASHBOARD) is None
+
+
+async def test_real_frontend_is_served(hass: HomeAssistant, setup_car, hass_client_no_auth) -> None:
+    """The shipped frontend folder: every module served as JavaScript at the versioned address."""
+    await setup_car()
+    info = hass.data[DATA_FRONTEND]
+    assert info["entry_url"] == f"{info['base_url']}/zoomy.js"
+    assert info["entry_url"] in hass.data[DATA_EXTRA_MODULE_URL].urls
+    client = await hass_client_no_auth()
+    names = sorted(name for name in os.listdir(frontend.FRONTEND_PATH) if name.endswith(".js"))
+    assert "zoomy.js" in names and "core.js" in names
+    for name in names:
+        resp = await client.get(f"{info['base_url']}/{name}")
+        assert resp.status == 200, name
+        # a module script must come with a JavaScript type, or the browser refuses it
+        assert "javascript" in resp.headers.get("Content-Type", ""), (name, resp.headers.get("Content-Type"))
+        assert "max-age" in resp.headers.get("Cache-Control", "")
+    # nothing outside the folder
+    resp = await client.get(f"{info['base_url']}/../const.py")
+    assert resp.status in (403, 404)

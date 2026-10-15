@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Zoomy card test</title>
+<!-- Test harness only, never shipped. Runs one case of cases.js (?case=name) against the Zoomy cards in a fake
+     Home Assistant page (fake-hass.js, stubs.js). When done: window.result = {results, errors, logs}, window.done. -->
+<style>
+  html, body { margin: 0; background: #fafafa; }
+  #bar { height: 56px; background: #03a9f4; }
+  #view { position: relative; }
+</style>
+</head>
+<body>
+<div id="bar"></div>
+<div id="view"></div>
+<script>
+  // everything the page says or throws is kept, to check that the cards log nothing (no coordinates, no ids)
+  window.__logs = [];
+  window.__errors = [];
+  ['log', 'info', 'warn', 'error', 'debug'].forEach(function (k) {
+    var orig = console[k];
+    console[k] = function () { window.__logs.push(k + ': ' + Array.prototype.map.call(arguments, String).join(' ')); return orig.apply(console, arguments); };
+  });
+  window.addEventListener('error', function (e) { window.__errors.push('error: ' + e.message); });
+  window.addEventListener('unhandledrejection', function (e) {
+    var r = e.reason; window.__errors.push('unhandled rejection: ' + (r && r.message ? r.message : JSON.stringify(r)));
+  });
+  try { localStorage.clear(); } catch (e) { /* none */ }
+</script>
+<script src="fake-hass.js"></script>
+<script src="stubs.js"></script>
+<script type="module" src="cases.js"></script>
+</body>
+</html>
