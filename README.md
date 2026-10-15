@@ -208,3 +208,5 @@ Frontend tests (Node 20 or later; the browser tests need Chrome or Chromium, alw
 ## Licence
 
 Copyright (C) 2026 Zoomy. This program is free software under the GNU General Public License, version 3 (GPL-3.0): see [LICENSE](LICENSE).
+
+This licence covers only the Home Assistant integration in this repository. The Zoomy app in the car is a separate, paid product under its own private licence (see zoomyzoom.com.au).
