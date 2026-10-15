@@ -204,3 +204,7 @@ Frontend tests (Node 20 or later; the browser tests need Chrome or Chromium, alw
 | `kWh/100km` | `const.py:548-554` |
 | A custom integration's own brand images: `custom_components/<domain>/brand/icon.png` etc., served at `/api/brands/integration/<domain>/<image>`; logo and dark images fall back to `icon.png` (2026.9.0 and 2026.10.1) | `components/brands/__init__.py:136-156, 243-274`; `components/brands/const.py:27-55`; `loader.py:699-707, 903-905`; frontend `20260930.2` builds `/api/brands/integration/${domain}/${dark_}${type}.png` |
 | HACS accepts `custom_components/<domain>/brand/icon.png` in place of an entry in home-assistant/brands | hacs/integration `custom_components/hacs/validate/brands.py:32-40` (main) |
+
+## Licence
+
+Copyright (C) 2026 Zoomy. This program is free software under the GNU General Public License, version 3 (GPL-3.0): see [LICENSE](LICENSE).

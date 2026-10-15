@@ -318,7 +318,9 @@ class RepositoryFilesTest(unittest.TestCase):
     def test_files_customers_and_hacs_need(self):
         for name in ("README.md", "LICENSE", "CHANGELOG.md", "PAIRING.md", "hacs.json"):
             self.assertTrue(os.path.isfile(os.path.join(ROOT, name)), name)
-        self.assertTrue(read(ROOT, "LICENSE").startswith("MIT License\n"))  # OSI approved
+        lic = read(ROOT, "LICENSE")
+        self.assertIn("GNU GENERAL PUBLIC LICENSE", lic)  # GPL-3.0, OSI approved
+        self.assertIn("Version 3, 29 June 2007", lic)
 
     def test_changelog_has_this_version(self):
         version = read_json(PKG, "manifest.json")["version"]
