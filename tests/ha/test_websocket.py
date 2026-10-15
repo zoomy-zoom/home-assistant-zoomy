@@ -141,3 +141,21 @@ async def test_read_only_user_may_read(hass: HomeAssistant, setup_car, post, has
     await ws.send_json_auto_id({"type": "zoomy/route", "trip_start": "2030-01-02T08:00"})
     reply = await ws.receive_json()
     assert reply["success"] and reply["result"]["points"] == route_points(2)
+
+
+async def test_user_without_access_to_the_car_reads_nothing(
+    hass: HomeAssistant, setup_car, post, hass_ws_client, hass_read_only_user, hass_read_only_access_token
+) -> None:
+    """A user whose permissions do not cover the car's sensors gets no data, routes least of all."""
+    await setup_car()
+    await post(car_post("route", trip_start="2030-01-02T08:00", points=route_points(2)))
+    hass_read_only_user.mock_policy({"entities": {"entity_ids": {"light.kitchen": True}}})
+    ws = await hass_ws_client(hass, hass_read_only_access_token)
+    await ws.send_json_auto_id({"type": "zoomy/cars"})
+    reply = await ws.receive_json()
+    assert reply["success"] and reply["result"]["cars"] == []
+    for msg in ({"type": "zoomy/route", "trip_start": "2030-01-02T08:00"}, {"type": "zoomy/route_keys"},
+                {"type": "zoomy/trips"}, {"type": "zoomy/runs"}, {"type": "zoomy/subscribe"}):
+        await ws.send_json_auto_id(msg)
+        reply = await ws.receive_json()
+        assert not reply["success"] and reply["error"]["code"] == "unauthorized", msg
