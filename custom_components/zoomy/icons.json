@@ -1,0 +1,123 @@
+{
+  "entity": {
+    "sensor": {
+      "last_update": {
+        "default": "mdi:car-connected"
+      },
+      "app_version": {
+        "default": "mdi:cellphone-information"
+      },
+      "last_trip_start": {
+        "default": "mdi:clock-start"
+      },
+      "last_trip_distance": {
+        "default": "mdi:map-marker-distance"
+      },
+      "last_trip_duration": {
+        "default": "mdi:timer-outline"
+      },
+      "last_trip_energy": {
+        "default": "mdi:lightning-bolt"
+      },
+      "last_trip_regen": {
+        "default": "mdi:recycle"
+      },
+      "last_trip_consumption": {
+        "default": "mdi:gauge"
+      },
+      "last_trip_battery_start": {
+        "default": "mdi:battery-arrow-up-outline"
+      },
+      "last_trip_battery_end": {
+        "default": "mdi:battery-arrow-down-outline"
+      },
+      "last_trip_outside_temperature": {
+        "default": "mdi:thermometer"
+      },
+      "last_charge_start": {
+        "default": "mdi:clock-start"
+      },
+      "last_charge_energy": {
+        "default": "mdi:battery-charging"
+      },
+      "last_charge_duration": {
+        "default": "mdi:timer-outline"
+      },
+      "last_charge_battery_start": {
+        "default": "mdi:battery-arrow-down-outline"
+      },
+      "last_charge_battery_end": {
+        "default": "mdi:battery-arrow-up-outline"
+      },
+      "last_charge_average_power": {
+        "default": "mdi:flash"
+      },
+      "last_charge_charger": {
+        "default": "mdi:ev-plug-type2"
+      },
+      "last_charge_cost": {
+        "default": "mdi:cash"
+      },
+      "last_charge_price": {
+        "default": "mdi:tag-outline"
+      },
+      "last_charge_off_peak": {
+        "default": "mdi:weather-night"
+      },
+      "battery_health": {
+        "default": "mdi:battery-heart-variant"
+      },
+      "battery_usable_energy": {
+        "default": "mdi:car-battery"
+      },
+      "this_month_distance": {
+        "default": "mdi:calendar-month"
+      },
+      "this_month_trips": {
+        "default": "mdi:road-variant"
+      },
+      "this_month_charges": {
+        "default": "mdi:ev-station"
+      },
+      "this_month_charges_without_price": {
+        "default": "mdi:cash-remove"
+      },
+      "this_month_energy_home": {
+        "default": "mdi:home-lightning-bolt-outline"
+      },
+      "this_month_energy_public": {
+        "default": "mdi:ev-station"
+      },
+      "this_month_consumption": {
+        "default": "mdi:gauge"
+      },
+      "this_month_cost": {
+        "default": "mdi:cash"
+      },
+      "last_month_distance": {
+        "default": "mdi:calendar-month-outline"
+      },
+      "last_month_trips": {
+        "default": "mdi:road-variant"
+      },
+      "last_month_charges": {
+        "default": "mdi:ev-station"
+      },
+      "last_month_charges_without_price": {
+        "default": "mdi:cash-remove"
+      },
+      "last_month_energy_home": {
+        "default": "mdi:home-lightning-bolt-outline"
+      },
+      "last_month_energy_public": {
+        "default": "mdi:ev-station"
+      },
+      "last_month_consumption": {
+        "default": "mdi:gauge"
+      },
+      "last_month_cost": {
+        "default": "mdi:cash"
+      }
+    }
+  }
+}

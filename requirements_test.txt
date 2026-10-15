@@ -1,0 +1,4 @@
+# Tests run against the Home Assistant release this package pins.
+pytest-homeassistant-custom-component==0.13.372
+# The real frontend integration (for the dashboard / static path tests).
+home-assistant-frontend==20260930.2

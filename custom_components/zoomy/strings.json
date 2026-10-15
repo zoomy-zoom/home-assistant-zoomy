@@ -1,0 +1,214 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Add a Zoomy car",
+        "description": "How does the car reach Home Assistant?",
+        "menu_options": {
+          "pair": "Pair a car with the code it shows",
+          "existing": "I already have a car sending to this Home Assistant"
+        }
+      },
+      "pair": {
+        "title": "Pair a car",
+        "description": "In the car, start pairing in the Zoomy app. The car must be on your home Wi-Fi. It shows a 6-digit code: type it here within 10 minutes.",
+        "data": {
+          "code": "Code from the car"
+        }
+      },
+      "existing": {
+        "title": "Car already sending",
+        "description": "Paste the webhook id the car sends to (the part after /api/webhook/, or the whole address). It is kept secret and never shown again.",
+        "data": {
+          "webhook_id": "Webhook id",
+          "name": "Car name"
+        },
+        "data_description": {
+          "webhook_id": "The id the car's Zoomy app posts to.",
+          "name": "Shown in Home Assistant, for example the car's model."
+        }
+      },
+      "reconfigure": {
+        "title": "New webhook id",
+        "description": "Use this when the Zoomy app made a new webhook id. Paste the new one; the old one stops working.",
+        "data": {
+          "webhook_id": "Webhook id"
+        }
+      }
+    },
+    "error": {
+      "invalid_code": "The code is 6 digits.",
+      "code_not_found": "No car has sent this code yet. Check the car is on the home Wi-Fi and still shows the code, then try again.",
+      "code_clash": "Two cars sent the same code. Start pairing again in the car.",
+      "invalid_webhook_id": "This is not a webhook id. Use 8 to 200 letters, digits, - or _.",
+      "webhook_in_use": "Something else in Home Assistant already uses this webhook id (for example an automation or a template trigger). Remove that first."
+    },
+    "abort": {
+      "already_configured": "This car is already added.",
+      "repaired": "This car is paired again. It now sends to its new webhook.",
+      "too_many_attempts": "Too many wrong codes. Start again.",
+      "webhook_in_use": "Something else in Home Assistant already uses the car's webhook id. Start pairing again in the car.",
+      "reconfigure_successful": "Saved. The car now sends to the new webhook id."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Zoomy options",
+        "data": {
+          "store_routes": "Keep GPS routes",
+          "delete_routes": "Delete the stored routes now"
+        },
+        "data_description": {
+          "store_routes": "Routes show where the car went. They stay on this Home Assistant and are left out of backups. Off: routes the car sends are thrown away.",
+          "delete_routes": "Deletes every route stored for this car. If Keep GPS routes stays on, the car sends the routes it still has again."
+        }
+      }
+    }
+  },
+  "entity": {
+    "sensor": {
+      "last_update": {
+        "name": "Last update"
+      },
+      "app_version": {
+        "name": "App version"
+      },
+      "last_trip_start": {
+        "name": "Last trip start"
+      },
+      "last_trip_distance": {
+        "name": "Last trip distance"
+      },
+      "last_trip_duration": {
+        "name": "Last trip duration"
+      },
+      "last_trip_energy": {
+        "name": "Last trip energy"
+      },
+      "last_trip_regen": {
+        "name": "Last trip regen"
+      },
+      "last_trip_consumption": {
+        "name": "Last trip consumption"
+      },
+      "last_trip_battery_start": {
+        "name": "Last trip battery at start"
+      },
+      "last_trip_battery_end": {
+        "name": "Last trip battery at end"
+      },
+      "last_trip_outside_temperature": {
+        "name": "Last trip outside temperature"
+      },
+      "last_charge_start": {
+        "name": "Last charge start"
+      },
+      "last_charge_energy": {
+        "name": "Last charge energy"
+      },
+      "last_charge_duration": {
+        "name": "Last charge duration"
+      },
+      "last_charge_battery_start": {
+        "name": "Last charge battery at start"
+      },
+      "last_charge_battery_end": {
+        "name": "Last charge battery at end"
+      },
+      "last_charge_average_power": {
+        "name": "Last charge average power"
+      },
+      "last_charge_charger": {
+        "name": "Last charge charger"
+      },
+      "last_charge_cost": {
+        "name": "Last charge cost"
+      },
+      "last_charge_price": {
+        "name": "Last charge price"
+      },
+      "last_charge_off_peak": {
+        "name": "Last charge off-peak share"
+      },
+      "battery": {
+        "name": "Battery"
+      },
+      "battery_health": {
+        "name": "Battery health"
+      },
+      "battery_usable_energy": {
+        "name": "Battery usable energy"
+      },
+      "this_month_distance": {
+        "name": "This month distance",
+        "state_attributes": {
+          "month": {
+            "name": "Month"
+          }
+        }
+      },
+      "this_month_trips": {
+        "name": "This month trips"
+      },
+      "this_month_charges": {
+        "name": "This month charges"
+      },
+      "this_month_charges_without_price": {
+        "name": "This month charges without a price"
+      },
+      "this_month_energy_home": {
+        "name": "This month charged at home"
+      },
+      "this_month_energy_public": {
+        "name": "This month charged away"
+      },
+      "this_month_consumption": {
+        "name": "This month consumption"
+      },
+      "this_month_cost": {
+        "name": "This month charging cost"
+      },
+      "last_month_distance": {
+        "name": "Last month distance",
+        "state_attributes": {
+          "month": {
+            "name": "Month"
+          }
+        }
+      },
+      "last_month_trips": {
+        "name": "Last month trips"
+      },
+      "last_month_charges": {
+        "name": "Last month charges"
+      },
+      "last_month_charges_without_price": {
+        "name": "Last month charges without a price"
+      },
+      "last_month_energy_home": {
+        "name": "Last month charged at home"
+      },
+      "last_month_energy_public": {
+        "name": "Last month charged away"
+      },
+      "last_month_consumption": {
+        "name": "Last month consumption"
+      },
+      "last_month_cost": {
+        "name": "Last month charging cost"
+      }
+    }
+  },
+  "issues": {
+    "add_dashboard": {
+      "title": "Add the ZOOMY dashboard",
+      "description": "Zoomy could not add its dashboard by itself. Go to Settings > Dashboards > Add dashboard and choose Zoomy."
+    }
+  },
+  "exceptions": {
+    "webhook_in_use": {
+      "message": "The car's webhook id is already used by something else in Home Assistant. Remove that, or give the car a new webhook id with Reconfigure."
+    }
+  }
+}
