@@ -1,14 +1,42 @@
 # Zoomy for Home Assistant
 
 See your car's trips, charges, dyno runs, charge curves and trip routes in Home Assistant.
-The Zoomy app in the car sends them straight to Home Assistant over your home Wi-Fi. Nothing
-goes through the internet, and everything stays on your Home Assistant.
+The Zoomy app in the car sends them straight to Home Assistant over your home Wi-Fi. The
+car's data never goes through the internet, and it is kept only on your Home Assistant.
+
+You need Home Assistant 2026.9 or later, [HACS](https://hacs.xyz), and a car with the
+Zoomy app that joins your home Wi-Fi.
 
 ## Install
 
-1. In HACS, add this repository as a custom repository (type: Integration), then install **Zoomy**.
-2. Restart Home Assistant.
-3. Go to **Settings > Devices & services > Add integration > Zoomy**.
+1. **Download Zoomy in HACS.**
+   [![Open in HACS](https://my.home-assistant.io/badges/hacs_repository.svg)](https://my.home-assistant.io/redirect/hacs_repository/?owner=zoomy-zoom&repository=home-assistant-zoomy&category=integration)
+   If the button does not work: in HACS, open the menu (three dots) > **Custom repositories**,
+   add `https://github.com/zoomy-zoom/home-assistant-zoomy` with type **Integration**, then
+   search for **Zoomy** and press **Download**.
+2. **Restart Home Assistant** (Settings > System > Restart).
+3. **Add a car.**
+   [![Add Zoomy](https://my.home-assistant.io/badges/config_flow_start.svg)](https://my.home-assistant.io/redirect/config_flow_start/?domain=zoomy)
+   or go to **Settings > Devices & services > Add integration > Zoomy**.
+
+That is all: no YAML, no files to edit. The ZOOMY dashboard appears in the sidebar as soon as
+the first car is added.
+
+## Screenshots
+
+<!--
+  Screenshot placeholders. Take them from a test car or with made-up data,
+  never from a real car's route (a route shows where someone lives).
+  Save them in docs/images/ and remove the comment marks:
+
+  ![The Summary tab](docs/images/summary.png)
+  ![The Trips tab](docs/images/trips.png)
+  ![The Trip map tab](docs/images/trip-map.png)
+  ![The Performance tab](docs/images/performance.png)
+  ![Add integration > Zoomy](docs/images/add-integration.png)
+-->
+
+_Screenshots will be added here._
 
 ## Add a car
 
@@ -16,7 +44,7 @@ Choose one of two ways:
 
 | Way | When | What you do |
 |---|---|---|
-| **Pair a car with the code it shows** | New cars | Start pairing in the Zoomy app in the car (the car must be on your home Wi-Fi). The car shows a 6-digit code. Type it in Home Assistant within 10 minutes. |
+| **Pair a car with the code it shows** | New cars (a Zoomy app version with Home Assistant pairing) | Start pairing in the Zoomy app in the car (the car must be on your home Wi-Fi). The car shows a 6-digit code. Type it in Home Assistant within 10 minutes. |
 | **I already have a car sending to this Home Assistant** | Cars that already post to a webhook | Paste the webhook id the car sends to (or the whole webhook address). It is kept secret and never shown again. |
 
 Each car gets its own device, called "Zoomy" and the car's name, with its sensors.
@@ -49,8 +77,13 @@ history either way.
   `entry_id` (one car only), `map_view` (summary: the tab its map button opens),
   `list_side: left` (trip map). See `custom_components/zoomy/frontend/README.md`.
 
-## Privacy
+## What stays at home
 
+* **The car sends its data straight to your Home Assistant** over your home Wi-Fi, never
+  over the internet. This integration sends none of it anywhere else and makes no internet
+  connections of its own.
+* **Everything the car sends is kept in your Home Assistant's own folders** (`.storage`
+  and `.cache/zoomy`), and is deleted when you remove the car.
 * **Routes show where the car went.** They are kept only on this Home Assistant, in its
   cache folder (`.cache/zoomy/` in the config folder), one private file per trip. They are
   never in a sensor, an attribute, the logbook, the log or the `www` folder.
@@ -83,45 +116,10 @@ history either way.
 
 ---
 
-## For the Zoomy app: what the car sends
+## For the Zoomy app: pairing and posts
 
-Every post is one JSON object, `POST http://<home-assistant>:8123/api/webhook/<webhook id>`,
-from the home Wi-Fi. Every post has `"source": "zoomy"`, `"version"` (the app version) and
-`"sent_at"` (local ISO time). Optional, accepted when present or absent: `"car_id"` (1 to
-128 printable characters; once Home Assistant knows a car's id, a post with another id is
-refused with 409) and `"format"` (a number; additive, only recorded).
-
-| `kind` | Body | Reply (HTTP 200) |
-|---|---|---|
-| none, `""`, `"snapshot"` | the snapshot (`last_trip`, `last_charge`, `this_month`, `last_month`, `trips`, `charges`, `health`, `runs`, `drain`, ...) | `{"ok": true, "kind": "snapshot"}` |
-| `trips`, `charges` | `{"rows": [...]}`, key `start`, at most 1000 rows | `{"ok": true, "kind", "stored", "skipped", "have"}` |
-| `dyno` | `envelope`, `regen_envelope`, `best`, `sag` replaced; `pulls` merged by `when` | `{"ok": true, "kind": "dyno", "stored", "skipped", "have"}` |
-| `charge_curve` | `{"charge_start", "points": [[minutes, soc, kw], ...]}` | `{"ok": true, "kind": "charge_curve", "stored": 1, "n", "have"}` |
-| `route` | `{"trip_start", "trip_end", "km", "points": [[lat, lon], ...]}` | `{"ok": true, "kind": "route", "stored": 1, "n", "have"}`; with routes turned off `{"ok": true, "stored": 0, "discarded": 1, "store_routes": false, ...}` |
-| `runs` | `{"rows": [{"when", "s_0_60", "s_0_80", "s_0_100", "s_400m", "trap_kmh", "peak_g"}, ...]}`, key `when`, at most 1000 rows | `{"ok": true, "kind": "runs", "stored", "skipped", "dropped", "have"}` |
-| `have` | `{"what": "trips" \| "charges" \| "charge_curves" \| "routes" \| "runs"}` | `{"ok": true, "kind": "have", "what", "keys": [...]}` (routes add `"store_routes"`; with routes off the keys include the routes thrown away, so the car stops sending them; runs include the runs the cap dropped) |
-
-Timed runs: Home Assistant keeps 500, by the same rule as the car: the best 125 by `s_0_60`,
-the best 125 by `s_0_100` and the best 125 by `s_400m` always stay (a missing time does not
-count); of the others the slowest `s_0_60` goes first (none = slowest), the oldest first among equals.
-
-Refused: 400 / 409 / 413 / 500 with `{"ok": false, "error": "<under 120 characters>"}`;
-503 while the car's entry is being reloaded or removed (try again on the next pass).
-An **empty 200** means the post did not reach Zoomy (unknown webhook id, or a sender outside
-the home network). Limits: body 2 MB, nesting 32 levels, keys 200 characters, 2000 points
-per curve or pull, 60,000 route points.
-
-### Pairing (car side, to be built)
-
-1. Find Home Assistant by mDNS (`_home-assistant._tcp`), private IPv4 only.
-2. Make a webhook id (16 to 128 of `A-Z a-z 0-9 - _`, random) and a 6-digit code; show the code.
-3. `POST /api/webhook/zoomy_pair` with `{"code": "123456", "car_id": "...", "webhook_id": "...", "name": "...", "version": "..."}`
-   (`code` as text; `name` and `version` optional). Replies: 200 `{"ok": true, "kind": "pair", "status": "waiting", "expires_in": 600}`;
-   409 when Home Assistant is not waiting; 429 when too many cars pair or posts come too fast;
-   400 for a bad body; an empty 200 when no "Pair a car" step is open (keep showing the code and try again).
-4. Post `have` to your own webhook every few seconds: a JSON reply means you are paired.
-
-Pairing a car that is already added moves it to its new webhook id.
+The exact contract for the car side (finding Home Assistant, the `zoomy_pair` webhook, codes,
+expiry, replies, and every post kind with its limits) is in [PAIRING.md](PAIRING.md).
 
 ## For the pages: websocket commands
 
@@ -159,10 +157,22 @@ custom_components/zoomy/
   frontend.py       serves frontend/ at /zoomy_static/<version>/ + loads frontend/zoomy.js
   dashboard.py      adds the ZOOMY dashboard once (strategy custom:zoomy)
   frontend/         the pages, cards and the dashboard strategy (see frontend/README.md)
+  brand/            icon.png (256 px) and icon@2x.png (512 px), drawn by scripts/make_brand_images.py
+PAIRING.md          the car-side contract (pairing and posts)
+CHANGELOG.md        what changed in each version
+.github/workflows/  hassfest, the HACS check and the tests, run on GitHub
 ```
 
 Tests: `pip install -r requirements_test.txt` in a virtual environment, then `python run_tests.py`. The pure tests also run with plain Python:
-`python -m unittest discover -s tests/pure -t .`
+`python -m unittest discover -s tests/pure -t .` (they include `tests/pure/test_packaging.py`, offline
+checks of the manifest, `hacs.json`, the translations, the icons and the brand images in the
+style of hassfest and the HACS check, and of the numbers in PAIRING.md). Before a push, put
+any names, places and addresses that must never be published in `tests/private_words.txt`
+(one per line; git ignores the file): the tests then fail if any file holds one of them.
+
+A new version: change `version` in `custom_components/zoomy/manifest.json` (the pages are
+served under that version, so browsers fetch them fresh), add a section to CHANGELOG.md, and
+make a GitHub release whose tag is that version.
 
 Frontend tests (Node 20 or later; the browser tests need Chrome or Chromium, always run headless with a fresh profile):
 
@@ -192,3 +202,5 @@ Frontend tests (Node 20 or later; the browser tests need Chrome or Chromium, alw
 | Flow ended or closed: `FlowHandler.async_remove` | `data_entry_flow.py:905`, called at `:464-474` |
 | Sensor state classes per device class (energy and money: totals only) | `components/sensor/const.py:816-871` |
 | `kWh/100km` | `const.py:548-554` |
+| A custom integration's own brand images: `custom_components/<domain>/brand/icon.png` etc., served at `/api/brands/integration/<domain>/<image>`; logo and dark images fall back to `icon.png` (2026.9.0 and 2026.10.1) | `components/brands/__init__.py:136-156, 243-274`; `components/brands/const.py:27-55`; `loader.py:699-707, 903-905`; frontend `20260930.2` builds `/api/brands/integration/${domain}/${dark_}${type}.png` |
+| HACS accepts `custom_components/<domain>/brand/icon.png` in place of an entry in home-assistant/brands | hacs/integration `custom_components/hacs/validate/brands.py:32-40` (main) |

@@ -1,0 +1,47 @@
+name: Validate
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 3 * * 1" # every Monday, to catch changes in Home Assistant and HACS
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  hassfest:
+    name: Hassfest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: home-assistant/actions/hassfest@master
+
+  hacs:
+    name: HACS
+    runs-on: ubuntu-latest
+    steps:
+      - uses: hacs/action@main
+        with:
+          category: integration
+
+  tests:
+    name: Tests
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - name: Install the test requirements
+        run: python -m pip install -r requirements_test.txt
+      - name: Python tests (Home Assistant and pure logic)
+        run: python run_tests.py -q
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "24"
+      - name: Frontend unit tests
+        run: node --test tests/frontend/unit.test.mjs
+      - name: Frontend browser tests (headless Chrome)
+        run: node tests/frontend/run.js

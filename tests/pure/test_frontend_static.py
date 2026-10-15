@@ -100,7 +100,8 @@ class FrontendFilesTest(unittest.TestCase):
             self.no_match(r"\b\d{1,3}(?:\.\d{1,3}){3}\b", code, f"{name}: an IP address")
             self.no_match(r"-?\b\d{1,3}\.\d{5,}\b", code, f"{name}: something like a coordinate")
             self.no_match(r"(?i)webhook|access_token|password|secret|token", code, f"{name}: a secret")
-            self.no_match(r"\bMG4\b|\bIM6\b|(?i:connected living)", text, f"{name}: the first owner's own words")
+            # Words private to an owner are checked repository-wide from a local,
+            # git-ignored list: tests/pure/test_packaging.py PrivateWordsTest.
             # browser storage: only the picked car, in core.js
             if name != "core.js":
                 self.no_match(r"localStorage|sessionStorage|indexedDB|document\.cookie", code, f"{name}: browser storage")

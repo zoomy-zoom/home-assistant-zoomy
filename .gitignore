@@ -9,3 +9,8 @@ tests/**/testing_config/
 
 # Screenshots made by tests/frontend/run.js shots
 tests/frontend/shots/
+
+# Words that must never be in the repository (names, places, addresses), one
+# per line; read by tests/pure/test_packaging.py.  Private, so never committed.
+tests/private_words.txt
+.ruff_cache/
