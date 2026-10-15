@@ -48,7 +48,9 @@ test('statusMarks: one text per kind, moving only with that kind', () => {
   assert.deepEqual(moved, ['trips']);
   const off = core.statusMarks({ started: 's', counts: { routes: 5 }, posts: { route: 1 }, store_routes: false });
   assert.notEqual(off.routes, core.statusMarks({ started: 's', counts: { routes: 5 }, posts: { route: 1 }, store_routes: true }).routes);
-  assert.deepEqual(Object.keys(core.statusMarks(null)), ['started', 'snapshot', 'trips', 'charges', 'dyno', 'curves', 'routes']);
+  assert.deepEqual(Object.keys(core.statusMarks(null)), ['started', 'snapshot', 'trips', 'charges', 'dyno', 'curves', 'routes', 'runs']);
+  const r1 = core.statusMarks({ counts: { runs: 3 }, posts: { runs: 1 } }), r2 = core.statusMarks({ counts: { runs: 3 }, posts: { runs: 2 } });
+  assert.deepEqual(Object.keys(r1).filter((k) => r1[k] !== r2[k]), ['runs']);
 });
 
 test('carFor: the fixed car, else the picked one, else the first', () => {

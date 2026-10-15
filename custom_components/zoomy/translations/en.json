@@ -30,7 +30,7 @@
       },
       "reconfigure": {
         "title": "New webhook id",
-        "description": "Use this when the Zoomy app made a new webhook id. Paste the new one; the old one stops working.",
+        "description": "Use this when the Zoomy app made a new webhook id. Paste the new one; the old one stops working. The car's data is kept.",
         "data": {
           "webhook_id": "Webhook id"
         }
@@ -40,7 +40,7 @@
       "invalid_code": "The code is 6 digits.",
       "code_not_found": "No car has sent this code yet. Check the car is on the home Wi-Fi and still shows the code, then try again.",
       "code_clash": "Two cars sent the same code. Start pairing again in the car.",
-      "invalid_webhook_id": "This is not a webhook id. Use 8 to 200 letters, digits, - or _.",
+      "invalid_webhook_id": "This is not a webhook id. It is 8 to 200 letters, digits and the signs - _ . ~",
       "webhook_in_use": "Something else in Home Assistant already uses this webhook id (for example an automation or a template trigger). Remove that first."
     },
     "abort": {

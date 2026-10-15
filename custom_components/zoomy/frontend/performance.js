@@ -522,7 +522,7 @@ function makePerformancePage(io) {
     return h;
   }
 
-  // ---- the two cards from the car's latest snapshot ----
+  // ---- the timed runs (kept by Home Assistant, else the car's latest snapshot) and the battery health (snapshot) ----
   var RUNCOLS = [['t60', '0' + DASH + '60 km/h (s)', 2, -1], ['t80', '0' + DASH + '80 km/h (s)', 2, -1], ['t100', '0' + DASH + '100 km/h (s)', 2, -1],
                  ['q', '400 m (s)', 2, -1], ['trap', 'Trap speed (km/h)', 0, 1], ['g', 'Peak g', 2, 1]];
   // the best of each column (the shortest time, the highest speed and g), when at least two runs have a value
@@ -553,7 +553,7 @@ function makePerformancePage(io) {
     return '<th><button type="button" class="sorter" data-sort="' + esc(key) + '" aria-pressed="' + (on ? 'true' : 'false') + '"' +
            ' title="Sort by this column">' + esc(label) + (on ? ' ▾' : '') + '</button></th>';
   }
-  // snap: { runs, health } from the car's latest snapshot, or null when it could not be read
+  // snap: { runs, source, health } (runs and source from zoomy/runs, health from the snapshot), or null when not read
   function runsCard(snap) {
     var h = '<h2>Timed runs</h2>';
     if (!snap) return h + '<div class="sub">The car\'s timed runs could not be read from Home Assistant just now.</div>';
@@ -562,7 +562,8 @@ function makePerformancePage(io) {
     var best = bestOf(rows), years = manyYears(rows), any = RUNCOLS.some(function (c) { return best[c[0]] !== null; }), last = null;
     var byDate = runSort === 'date', sortCol = RUNCOLS.filter(function (c) { return c[0] === runSort; })[0];
     rows = sortRuns(rows);
-    h += '<div class="sub">' + (rows.length === 1 ? 'The one timed run' : 'The ' + rows.length + ' timed runs') + ' in the car\'s latest upload' +
+    h += '<div class="sub">' + (rows.length === 1 ? 'The one timed run' : 'The ' + rows.length + ' timed runs') +
+         (snap.source === 'store' ? ' kept by Home Assistant' : ' in the car\'s latest upload') +
          (rows.length > 1 ? (byDate || !sortCol ? ', newest first' : ', best ' + sortCol[1].replace(/ \([^)]*\)$/, '') + ' first') : '') +
          '. Tap a column heading to sort by it. Trap speed is the speed at the end of the 400 m.' +
          (any ? ' <span class="star" aria-hidden="true">' + STAR + '</span> marks the best in each column.' : '') + '</div>' +
@@ -598,15 +599,18 @@ function makePerformancePage(io) {
     });
     belowEl.hidden = false;
   }
-  // the timed runs and the battery health come with the car's snapshot: read it when it has changed
+  /* The battery health comes with the car's snapshot; the timed runs from zoomy/runs (the runs Home Assistant keeps,
+     or the snapshot's while it keeps none; the snapshot's too if that cannot be read). Both are read again when the
+     snapshot or the runs have changed. */
   function cards() {
-    var sig = io.sig(['snapshot']);
+    var sig = io.sig(['snapshot', 'runs']);
     if (cardsBusy || (sig === cardsSig && !(cardsRetry && Date.now() >= cardsRetry))) return;
     cardsBusy = true; cardsRetry = 0;
-    io.ask('snapshot', null, 30000).then(function (r) {
+    var kept = io.ask('runs', null, 30000).then(function (r) { return r && Array.isArray(r.rows) ? r : null; }, function () { return null; });
+    Promise.all([io.ask('snapshot', null, 30000), kept]).then(function (both) {
       if (dead) return;
-      var snap = r && obj(r.snapshot) ? r.snapshot : {};
-      cardsFor = { runs: snap.runs, health: snap.health };
+      var snap = both[0] && obj(both[0].snapshot) ? both[0].snapshot : {}, k = both[1];
+      cardsFor = k ? { runs: k.rows, source: k.source, health: snap.health } : { runs: snap.runs, source: 'snapshot', health: snap.health };
     }, function () {
       if (dead) return;
       if (cardsSig === null) cardsFor = null;          // never read: say so; a later failure keeps what was read before

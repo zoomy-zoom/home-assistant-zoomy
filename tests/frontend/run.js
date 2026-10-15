@@ -62,7 +62,9 @@ function caseNames() {
   const out = [], re = /^CASES\.([a-z0-9_]+) = /gm;
   let m;
   while ((m = re.exec(src))) out.push(m[1]);
-  return out;
+  // ZOOMY_CASES=a,b runs only those cases
+  const only = (process.env.ZOOMY_CASES || '').split(',').filter(Boolean);
+  return only.length ? out.filter(function (n) { return only.indexOf(n) >= 0; }) : out;
 }
 
 async function groupCases(base) {

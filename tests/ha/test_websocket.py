@@ -32,7 +32,7 @@ async def test_all_reads(hass: HomeAssistant, setup_car, post, hass_ws_client) -
     assert car["entry_id"] == entry.entry_id
     assert car["title"] == "Test car"
     assert car["app_version"] == "4.18.20"
-    assert car["counts"] == {"trips": 2, "charges": 1, "dyno_pulls": 1, "charge_curves": 1, "routes": 1}
+    assert car["counts"] == {"trips": 2, "charges": 1, "dyno_pulls": 1, "charge_curves": 1, "routes": 1, "runs": 0}
     assert car["entities"]["last_trip_distance"] == "sensor.zoomy_test_car_last_trip_distance"
     assert len(car["entities"]) == 40
     assert "webhook" not in str(reply).lower()  # the webhook id is never served
@@ -125,7 +125,7 @@ async def test_subscribe(hass: HomeAssistant, setup_car, post, hass_ws_client) -
     assert event["event"] == {
         "entry_id": entry.entry_id,
         "changed": ["trips", "version"],  # the first post also told the app version
-        "counts": {"trips": 1, "charges": 0, "dyno_pulls": 0, "charge_curves": 0, "routes": 0},
+        "counts": {"trips": 1, "charges": 0, "dyno_pulls": 0, "charge_curves": 0, "routes": 0, "runs": 0},
     }
     # an empty "have" changes nothing: no event; the next change does send one
     await post(car_post("have", what="trips"))

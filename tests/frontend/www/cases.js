@@ -408,6 +408,30 @@ CASES.performance = async function () {
   eq(calls(fake, 'zoomy/dyno').length, d0 + 1, 'new dyno data: the pulls are read again');
 };
 
+CASES.performance_kept_runs = async function () {
+  const fake = FakeHass.make({ keptRuns: true });
+  const card = mount(fake, 'zoomy-performance-card', {});
+  await until(() => all(card, '#runs tbody tr').length);
+  eq(all(card, '#runs tbody tr').length, 3, 'the runs Home Assistant keeps');
+  ok(/kept by Home Assistant/.test(txt(card, '#runs .sub')), 'says where they come from: ' + txt(card, '#runs .sub'));
+  ok(calls(fake, 'zoomy/runs').length >= 1, 'reads zoomy/runs');
+  // new runs arrive: read again
+  const r0 = calls(fake, 'zoomy/runs').length;
+  fake.data('entry0001').runs.push({ when: new Date().toISOString(), s_0_60: 2.2, s_0_100: 3.5 });
+  fake.emit('entry0001', ['runs']);
+  await until(() => all(card, '#runs tbody tr').length === 4, 8000);
+  ok(calls(fake, 'zoomy/runs').length > r0, 'a runs post: the runs are read again');
+  eq(all(card, '#runs tbody tr').length, 4, 'the new run is shown');
+};
+
+CASES.performance_runs_unreadable = async function () {
+  const fake = FakeHass.make({ fail: { 'zoomy/runs': { code: 'unknown_command', message: 'Unknown command.' } } });
+  const card = mount(fake, 'zoomy-performance-card', {});
+  await until(() => all(card, '#runs tbody tr').length);
+  eq(all(card, '#runs tbody tr').length, 3, 'zoomy/runs cannot be read: the runs of the snapshot');
+  ok(/in the car's latest upload/.test(txt(card, '#runs .sub')), 'and says so');
+};
+
 CASES.performance_absent = async function () {
   const fake = FakeHass.make({ fail: { 'zoomy/dyno': { code: 'unknown_command', message: 'Unknown command.' } } });
   const card = mount(fake, 'zoomy-performance-card', {});
@@ -542,6 +566,49 @@ CASES.privacy = async function () {
   const res = performance.getEntriesByType('resource').map((r) => r.name);
   ok(res.every((u) => u.indexOf(location.origin) === 0), 'nothing loaded from another host');
   ok(res.filter((u) => /\/zoomy_static\//.test(u)).every((u) => u.indexOf('/zoomy_static/' + V + '/') > 0), 'every file from the versioned folder');
+};
+
+/* Hostile data: whoever knows a car's webhook id can post any text, so every text from the car (and the car's name,
+   and sensor states) is a script attempt here. No card may turn any of it into markup. */
+CASES.hostile = async function () {
+  const BAD = '<img src=x onerror="window.__xss=1"><script>window.__xss=2</script>"\'><svg onload="window.__xss=3">';
+  const fake = FakeHass.make({ cars: [{ entry_id: 'entry0001', title: 'Car ' + BAD, slug: 'test_car', seed: 20301001 },
+                                      { entry_id: 'entry0002', title: BAD, slug: 'second_car', seed: 20301002 }] });
+  ['entry0001', 'entry0002'].forEach(function (id) {
+    const d = fake.data(id);
+    d.trips.forEach(function (t) { t.note = BAD; t.feels_c = BAD; });
+    d.charges.forEach(function (c) { c.type = BAD; c.place = BAD; c.breakdown = BAD; });
+    d.dyno.pulls.forEach(function (p) { p.mode = BAD; p.note = BAD; });
+    d.dyno.best = { kw: BAD, kmh: BAD };
+    d.dyno.sag = { volts: BAD, at_kw: BAD };
+    d.runs.forEach(function (r) { r.mode = BAD; r.note = BAD; });
+    d.runs.push({ when: BAD, s_0_60: BAD, s_0_100: 3.1 });
+    d.health = { usable_kwh: BAD, soh_pct: BAD, charges_counted: BAD };
+    d.routeKeys.push({ trip_start: BAD, trip_end: BAD, km: BAD, n: BAD });
+    d.keys.push(BAD);
+  });
+  const car = fake.car('entry0001');
+  fake.set(car.ids.last_charge_charger, BAD);
+  fake.set(car.ids.app_version, BAD);
+  const tags = ['zoomy-summary-card', 'zoomy-trips-card', 'zoomy-charges-card', 'zoomy-route-map-card', 'zoomy-performance-card', 'zoomy-charge-sheet-card'];
+  const cards = tags.map((t) => { const el = mount(fake, t, {}); el.hass = fake.hass; return el; });
+  await sleep(6000);
+  // tap around: every pull, every charge, every period, every run heading, both cars
+  for (const c of cards) {
+    for (const b of all(c, 'button').slice(0, 40)) { click(b); await sleep(30); }
+  }
+  await sleep(3000);
+  const bad = [];
+  cards.forEach(function (c) {
+    Array.from(c.shadowRoot.querySelectorAll('*')).forEach(function (el) {
+      if (/^(img|script|iframe|object|embed)$/i.test(el.tagName)) bad.push(c.tagName + ' ' + el.tagName);
+      Array.from(el.attributes).forEach(function (a) { if (/^on/i.test(a.name)) bad.push(c.tagName + ' ' + el.tagName + '[' + a.name + ']'); });
+    });
+  });
+  ok(!bad.length, 'no markup from the car\'s texts: ' + bad.slice(0, 5).join(', '));
+  ok(window.__xss === undefined, 'no script ran (' + window.__xss + ')');
+  ok(cards.some((c) => c.shadowRoot.textContent.indexOf('<img') >= 0), 'the hostile text is shown as text somewhere');
+  ok(window.__errors.length === 0, 'no error: ' + window.__errors.slice(0, 3).join(' / '));
 };
 
 // ---- run --------------------------------------------------------------------------------------------------------

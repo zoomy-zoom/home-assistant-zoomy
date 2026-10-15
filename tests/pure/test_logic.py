@@ -683,9 +683,9 @@ class TestKinds(Base):
     def test_status(self):
         status = self.data.status()
         self.assertEqual(status["counts"], {"trips": 0, "charges": 0, "dyno_pulls": 0,
-                                            "charge_curves": 0, "routes": 0})
+                                            "charge_curves": 0, "routes": 0, "runs": 0})
         self.assertEqual(set(status["last"]), {"snapshot", "trips", "charges", "dyno",
-                                               "charge_curve", "route", "have"})
+                                               "charge_curve", "route", "runs", "have"})
         self.assertTrue(all(value is None for value in status["last"].values()))
         self.ok(post(trips=[trip("2030-01-01T08:00")], charges=[]))
         self.ok(post("trips", rows=[trip("2030-01-01T08:00")]))
@@ -797,7 +797,7 @@ class TestRawBody(Base):
             reply, _ = self.raw(json.dumps(body).encode(), 400)
             self.assertEqual(reply["error"], "body is nested too deeply")
         self.assertEqual(self.data.counts(), {"trips": 1, "charges": 0, "dyno_pulls": 0,
-                                              "charge_curves": 0, "routes": 0})
+                                              "charge_curves": 0, "routes": 0, "runs": 0})
         self.assertIsNone(self.data.dyno["best"])
         # what the car really sends is nowhere near the limit
         pulls = [{"when": "2030-01-01T10:00", "points": [[20, 60.0]]}]
@@ -1077,7 +1077,7 @@ class TestPersistence(Base):
             text = self.data.load(name, None)
             self.assertIn("starting empty", text)
         self.assertEqual(self.data.counts(), {"trips": 0, "charges": 0, "dyno_pulls": 0,
-                                              "charge_curves": 0, "routes": 0})
+                                              "charge_curves": 0, "routes": 0, "runs": 0})
         self.assertEqual(self.data.dyno_view(), {"envelope": None, "regen_envelope": None,
                                                  "best": None, "sag": None, "pulls": []})
 
@@ -1090,8 +1090,9 @@ class TestPersistence(Base):
                 if name == "snapshot":
                     self.assertIsNone(self.data.snapshot)
                     continue
-                self.assertEqual(len(self.data.dump(name)) if name != "dyno"
-                                 else len(self.data.dump(name)["pulls"]), 0)
+                dumped = self.data.dump(name)
+                self.assertEqual(len(dumped["pulls"]) if name == "dyno"
+                                 else len(dumped["rows"]) if name == "runs" else len(dumped), 0)
         self.assertIn("starting empty", self.data.load("dyno", {"envelope": []}))        # no pulls
         self.assertIn("starting empty", self.data.load("dyno", {"pulls": [1, 2]}))
         # the store still works afterwards
@@ -1154,3 +1155,91 @@ class TestNoHomeAssistant(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class TestRuns(Base):
+    """The timed runs kind: merged by "when", the best 500 kept by the agreed rule."""
+
+    @staticmethod
+    def timed(when, s60=None, s100=None, q=None, **extra):
+        return {"when": when, "s_0_60": s60, "s_0_80": None, "s_0_100": s100, "s_400m": q,
+                "trap_kmh": None, "peak_g": None, **extra}
+
+    def test_merge_reply_and_have(self):
+        reply, effects = self.ok(post("runs", rows=[self.timed("2030-01-01T08:00", 3.1),
+                                                    self.timed("2030-01-02T08:00", 2.9), {"no": "when"}]))
+        self.assertEqual(reply, {"ok": True, "kind": "runs", "stored": 2, "skipped": 1, "dropped": 0, "have": 2})
+        self.assertEqual(effects, {"save": ("runs",)})
+        reply, _ = self.ok(post("have", what="runs"))
+        self.assertEqual(reply["keys"], ["2030-01-02T08:00", "2030-01-01T08:00"])
+        # the same run again replaces it
+        self.ok(post("runs", rows=[self.timed("2030-01-01T08:00", 3.0)]))
+        self.assertEqual(self.data.runs["2030-01-01T08:00"]["s_0_60"], 3.0)
+        self.assertEqual(self.data.counts()["runs"], 2)
+        self.assertIn("runs", self.data.status()["posts"])
+
+    def test_bad_runs_post_is_refused(self):
+        for rows in (None, "x", {"a": 1}):
+            self.refused(post("runs", rows=rows))
+        self.refused(post("runs", rows=[self.timed(f"2030-01-01T{i:05d}") for i in range(core.MAX_ROWS + 1)]))
+        self.assertEqual(self.data.runs, {})
+
+    def test_cap_keeps_the_best_and_drops_the_slowest_oldest_first(self):
+        rows = []
+        # 125 very good 0-60s, 125 very good 0-100s (no 0-60), 125 very good 400 m (no 0-60)
+        for i in range(125):
+            rows.append(self.timed(f"2030-01-01T{i:05d}a", s60=2.0 + i / 1000))
+            rows.append(self.timed(f"2030-01-01T{i:05d}b", s100=4.0 + i / 1000))
+            rows.append(self.timed(f"2030-01-01T{i:05d}c", q=11.0 + i / 1000))
+        # 125 ordinary runs with a 0-60, and 5 runs with no times at all (slowest)
+        for i in range(125):
+            rows.append(self.timed(f"2030-02-01T{i:05d}d", s60=5.0 + i / 100))
+        for i in range(5):
+            rows.append(self.timed(f"2030-03-01T{i:05d}e"))
+        self.assertEqual(len(rows), 505)
+        reply, _ = self.ok(post("runs", rows=rows))
+        self.assertEqual((reply["stored"], reply["dropped"], reply["have"]), (505, 5, 500))
+        # the five with no time went (slowest), every protected run stayed
+        self.assertFalse(any(key.endswith("e") for key in self.data.runs))
+        # one more slow run: the slowest 0-60 among the ordinary ones goes
+        reply, _ = self.ok(post("runs", rows=[self.timed("2030-04-01T00000f", s60=4.0)]))
+        self.assertEqual(reply["dropped"], 1)
+        self.assertNotIn("2030-02-01T00124d", self.data.runs)          # 6.24 s, the slowest
+        self.assertIn("2030-04-01T00000f", self.data.runs)
+        # equal times: the oldest goes first
+        reply, _ = self.ok(post("runs", rows=[self.timed("2031-01-01T00000g", s60=6.23)]))
+        self.assertNotIn("2030-02-01T00123d", self.data.runs)          # 6.23 s and older
+        self.assertIn("2031-01-01T00000g", self.data.runs)
+        self.assertEqual(len(self.data.runs), core.MAX_RUNS)
+        # a dropped run is listed by "have", so the car does not send it again
+        keys = self.ok(post("have", what="runs"))[0]["keys"]
+        self.assertIn("2030-02-01T00124d", keys)
+        self.assertIn("2030-03-01T00000e", keys)
+        self.assertEqual(len(keys), 500 + 5 + 2)
+
+    def test_no_time_and_bad_times_count_as_slowest(self):
+        self.assertEqual(core._run_time({"s_0_60": None}, "s_0_60"), math.inf)
+        for bad in (0, -1, True, "3.1", float("nan")):
+            self.assertEqual(core._run_time({"s_0_60": bad}, "s_0_60"), math.inf, bad)
+        self.assertEqual(core._run_time({"s_0_60": 3}, "s_0_60"), 3)
+
+    def test_view_falls_back_to_the_snapshot(self):
+        self.ok(post(runs=[self.timed("2030-01-01T08:00", 3.1), "junk"]))
+        self.assertEqual(self.data.runs_view(), {"rows": [self.timed("2030-01-01T08:00", 3.1)], "source": "snapshot"})
+        self.ok(post("runs", rows=[self.timed("2030-01-02T08:00", 2.9), self.timed("2030-01-03T08:00", 3.3)]))
+        view = self.data.runs_view()
+        self.assertEqual(view["source"], "store")
+        self.assertEqual([row["when"] for row in view["rows"]], ["2030-01-03T08:00", "2030-01-02T08:00"])
+        self.assertEqual(core.ZoomyData().runs_view(), {"rows": [], "source": "store"})
+
+    def test_persistence_round_trip(self):
+        rows = [self.timed(f"2030-01-01T{i:05d}", s60=5 + i / 100) for i in range(core.MAX_RUNS + 3)]
+        self.ok(post("runs", rows=rows))
+        saved = json.loads(json.dumps(self.data.dump("runs")))
+        other = core.ZoomyData()
+        self.assertIsNone(other.load("runs", saved))
+        self.assertEqual(other.runs, self.data.runs)
+        self.assertEqual(other.have("runs"), self.data.have("runs"))
+        self.assertIn("starting empty", other.load("runs", {"rows": []}))
+        self.assertIn("1 stored entries", other.load("runs", {"rows": {"a": {"when": "b"}, "c": {"when": "c"}}}))
+        self.assertEqual(list(other.runs), ["c"])

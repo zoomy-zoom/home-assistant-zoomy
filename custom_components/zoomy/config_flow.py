@@ -40,7 +40,8 @@ from homeassistant.helpers.selector import (
     TextSelectorType,
 )
 
-from . import pairing
+from . import logic, pairing
+from .car import routes_dir
 from .const import (
     CONF_CAR_ID,
     CONF_CAR_NAME,
@@ -249,7 +250,14 @@ class ZoomyConfigFlow(ConfigFlow, domain=DOMAIN):
             elif webhook_id != entry.data.get(CONF_WEBHOOK_ID) and self._taken(webhook_id):
                 errors[CONF_WEBHOOK_ID] = "webhook_in_use"
             else:
-                updates: dict[str, Any] = {"data_updates": {CONF_WEBHOOK_ID: webhook_id}}
+                # The car_id is learnt again from the car's next post: a new
+                # webhook id usually means the app was set up again, and it
+                # may then name the car differently.  Kept, every post would
+                # be refused with 409 and nothing but removing the car (and
+                # its history) would help.
+                data = {key: value for key, value in entry.data.items() if key != CONF_CAR_ID}
+                data[CONF_WEBHOOK_ID] = webhook_id
+                updates: dict[str, Any] = {"data": data}
                 if entry.unique_id and entry.unique_id.startswith("webhook-"):
                     updates["unique_id"] = webhook_unique_id(webhook_id)
                 return self.async_update_reload_and_abort(entry, **updates)
@@ -275,11 +283,18 @@ class ZoomyOptionsFlow(OptionsFlowWithReload):
             store_routes = bool(user_input.get(CONF_STORE_ROUTES, DEFAULT_STORE_ROUTES))
             if user_input.get(CONF_DELETE_ROUTES):
                 car = getattr(self.config_entry, "runtime_data", None)
-                if car is not None:
+                if car is not None and not car.closed:
                     # Decided with the new setting, so with storage off the
                     # deleted routes are not sent again.
                     car.data.store_routes = store_routes
                     await car.async_delete_routes()
+                else:
+                    # The car is not loaded (for example its set-up failed):
+                    # delete the files themselves.  The route list is checked
+                    # against the files when the car is next loaded.
+                    await self.hass.async_add_executor_job(
+                        logic.delete_route_files, routes_dir(self.hass, self.config_entry.entry_id)
+                    )
             # The one-shot "delete" choice is never stored.
             return self.async_create_entry(data={CONF_STORE_ROUTES: store_routes})
         current = self.config_entry.options.get(CONF_STORE_ROUTES, DEFAULT_STORE_ROUTES)

@@ -162,7 +162,7 @@ export function carFor(cars, fixed) {
 // ---------------------------------------------------------------------------------------------------------------
 
 const watches = new Map();       // entry id -> Watch
-const STATUS_NAMES = ['snapshot', 'trips', 'charges', 'dyno', 'curves', 'routes'];
+const STATUS_NAMES = ['snapshot', 'trips', 'charges', 'dyno', 'curves', 'routes', 'runs'];
 
 /* What zoomy/status says about each kind of data, as one text per name (no payload, no coordinates): how many
    posts of that kind came and how much is held. A name whose text moves has changed. */
@@ -176,7 +176,8 @@ export function statusMarks(r) {
     charges: j([p.charges, c.charges]),
     dyno: j([p.dyno, c.dyno_pulls]),
     curves: j([p.charge_curve, c.charge_curves]),
-    routes: j([p.route, c.routes, r && r.store_routes])
+    routes: j([p.route, c.routes, r && r.store_routes]),
+    runs: j([p.runs, c.runs])
   };
 }
 

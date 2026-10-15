@@ -10,6 +10,7 @@
      opts.hang      [type]                   questions that never answer
      opts.empty     true: no data at all (no trips, charges, pulls, curves, routes; sensors unknown)
      opts.routesOff true: route storage is turned off (route_keys says store_routes false)
+     opts.keptRuns  true: zoomy/runs answers with runs Home Assistant keeps (source store), else the snapshot's
    Returned: { hass, calls, subs, emit(entry_id, changed), reconnect(), data(entry_id), setState(id, state) } */
 window.FakeHass = (function () {
   'use strict';
@@ -198,6 +199,11 @@ window.FakeHass = (function () {
       if (ty === 'zoomy/charges') return { ok: { rows: d.charges.slice().reverse(), source: 'store' } };
       if (ty === 'zoomy/dyno') return { ok: d.dyno };
       if (ty === 'zoomy/snapshot') return { ok: { snapshot: opts.empty ? {} : { runs: d.runs, health: d.health, trips: d.trips.slice(-20).reverse() }, received: iso(now - 300000) } };
+      if (ty === 'zoomy/runs') {
+        // as the integration: the runs it keeps (opts.keptRuns), else the snapshot's
+        if (opts.keptRuns) return { ok: { rows: d.runs.slice().sort(function (a, b) { return a.when < b.when ? 1 : -1; }), source: 'store' } };
+        return { ok: { rows: opts.empty ? [] : d.runs, source: 'snapshot' } };
+      }
       if (ty === 'zoomy/curve_keys') return { ok: { keys: d.keys } };
       if (ty === 'zoomy/charge_curve') {
         return d.curves[msg.charge_start] ? { ok: { charge_start: msg.charge_start, points: d.curves[msg.charge_start] } }
@@ -209,7 +215,7 @@ window.FakeHass = (function () {
       }
       if (ty === 'zoomy/status') {
         return { ok: { entry_id: car.entry_id, counts: { trips: d.trips.length, charges: d.charges.length, dyno_pulls: d.dyno.pulls.length,
-                                                         charge_curves: d.keys.length, routes: d.routeKeys.length },
+                                                         charge_curves: d.keys.length, routes: d.routeKeys.length, runs: opts.keptRuns ? d.runs.length : 0 },
                        posts: clone(car.posts), started: car.started, snapshot_received: iso(now - 300000), app_version: '4.18.20', store_routes: !opts.routesOff } };
       }
       return { err: { code: 'unknown_command', message: 'Unknown command.' } };

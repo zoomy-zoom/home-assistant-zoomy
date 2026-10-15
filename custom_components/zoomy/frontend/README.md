@@ -57,7 +57,7 @@ Only Home Assistant's signed-in websocket, never `/local`, never `www`, never a 
 | all | `zoomy/cars` (the cars this user may read, their sensors' entity ids), `zoomy/subscribe` (an event after every post that changed something), `zoomy/status` (once a minute, a safety net for a missed event) |
 | summary | the integration's sensors (`hass.states`), written by Home Assistant's own formatter |
 | trips, charges | `zoomy/trips`, `zoomy/charges` (read again after a change to that kind, or a new snapshot) |
-| performance | `zoomy/dyno`, `zoomy/snapshot` (runs, health) |
+| performance | `zoomy/dyno`, `zoomy/runs` (the timed runs Home Assistant keeps, else the snapshot's), `zoomy/snapshot` (health) |
 | charge sheet | `zoomy/curve_keys`, `zoomy/charges`, `zoomy/charge_curve` (the chosen charge only) |
 | trip map | `zoomy/route_keys`, `zoomy/trips`, `zoomy/route` (the chosen trip only) |
 
@@ -67,6 +67,9 @@ car's entry is reloaded. Repeating timers skip their turn while a card is off sc
 
 Privacy: a route's points are held only inside the line on the map, for the trip on screen; nothing is
 logged; the only thing kept in the browser is the picked car's entry id (`localStorage` key `zoomy.car`).
+The map pictures come from the map service Home Assistant's own maps use, so that service sees which area is
+shown (as for any Home Assistant map). Every text from the car is written as text, never as markup (browser
+case `hostile`).
 
 ## Where the pages came from
 

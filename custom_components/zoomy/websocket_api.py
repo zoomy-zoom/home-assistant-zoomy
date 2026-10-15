@@ -11,6 +11,7 @@ with two or more cars it is required (the answer of zoomy/cars lists them).
     zoomy/trips         [entry_id]      {"rows", "source"} newest first
     zoomy/charges       [entry_id]      {"rows", "source"} newest first
     zoomy/dyno          [entry_id]      envelope, best, sag, pulls
+    zoomy/runs          [entry_id]      {"rows", "source"} timed runs, newest first
     zoomy/curve_keys    [entry_id]      {"keys"} of the stored charge curves
     zoomy/charge_curve  charge_start    one charge curve
     zoomy/route_keys    [entry_id]      {"routes": [{trip_start, trip_end, km, n}]}
@@ -54,6 +55,7 @@ def async_setup(hass: HomeAssistant) -> None:
         ws_trips,
         ws_charges,
         ws_dyno,
+        ws_runs,
         ws_curve_keys,
         ws_charge_curve,
         ws_route_keys,
@@ -140,6 +142,7 @@ ws_snapshot = _simple("zoomy/snapshot", lambda car: car.data.snapshot_view())
 ws_trips = _simple("zoomy/trips", lambda car: car.data.rows_view("trips"))
 ws_charges = _simple("zoomy/charges", lambda car: car.data.rows_view("charges"))
 ws_dyno = _simple("zoomy/dyno", lambda car: car.data.dyno_view())
+ws_runs = _simple("zoomy/runs", lambda car: car.data.runs_view())
 ws_curve_keys = _simple("zoomy/curve_keys", lambda car: {"keys": car.data.curve_keys()})
 ws_route_keys = _simple(
     "zoomy/route_keys",

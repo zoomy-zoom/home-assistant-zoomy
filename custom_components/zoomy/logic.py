@@ -14,6 +14,8 @@ What the car sends, in short (every body is one JSON object with "source":
     "dyno"                               envelope etc. replaced, pulls merged
     "charge_curve"                       one curve, key "charge_start"
     "route"                              one GPS route, key "trip_start"
+    "runs"                               {"rows": [...]} timed runs, by "when";
+                                         the best 500 are kept (see trim_runs)
     "have"                               asks which keys are already stored
 
 Optional fields that later app versions may add, accepted when present and
@@ -47,6 +49,15 @@ MAX_POINTS = 2000  # points in one dyno pull or one charge curve
 MAX_ROUTE_POINTS = 60000  # [lat, lon] pairs in one route
 MAX_KEY_LEN = 200  # a key (a start time) longer than this is not a key
 MAX_DECLINED = 20000  # route keys remembered while route storage is off
+# Timed runs (the rule agreed for the car and Home Assistant alike): at most
+# MAX_RUNS are kept.  The best RUNS_PROTECTED by each of RUN_PROTECT_COLUMNS
+# (shortest time; a missing time does not count) always stay; of the others
+# the slowest 0-60 goes first (no 0-60 = slowest), the oldest first among
+# equals.
+MAX_RUNS = 500
+RUNS_PROTECTED = 125
+RUN_PROTECT_COLUMNS = ("s_0_60", "s_0_100", "s_400m")
+MAX_EVICTED = 5000  # run keys remembered after the cap dropped them
 # Lists / objects inside each other, the body itself being level 1.  A real
 # post needs 5 (body > pulls > pull > points > point).  Home Assistant reads
 # JSON up to 1024 levels deep but cannot write more than about 255 (orjson),
@@ -59,7 +70,7 @@ SNAPSHOT_LIMIT = 65536
 MAX_VERSION_LEN = 40
 
 # The sets that are persisted (names used for the Store keys too).
-SETS = ("trips", "charges", "dyno", "curves", "routes", "declined", "snapshot")
+SETS = ("trips", "charges", "dyno", "curves", "routes", "declined", "snapshot", "runs")
 
 # car_id: printable ASCII without spaces, 1 to 128 characters.
 _CAR_ID_RE = re.compile(r"[\x21-\x7e]{1,128}")
@@ -70,6 +81,7 @@ HAVE_SETS = {
     "charges": "charges",
     "charge_curves": "curves",
     "routes": "routes",
+    "runs": "runs",
 }
 
 # Dyno keys that every dyno post repeats; the newest post simply wins.
@@ -153,6 +165,12 @@ def _points_problem(points: Any, limit: int) -> str | None:
             if value is not None and not _is_number(value):
                 return "a point is not a list of numbers"
     return None
+
+
+def _run_time(row: dict[str, Any], column: str) -> float:
+    """Return a timed run's time in one column; inf when it has none."""
+    value = row.get(column)
+    return value if _is_number(value) and value > 0 else math.inf
 
 
 def _newest_first(keys) -> list[str]:
@@ -522,6 +540,9 @@ class ZoomyData:
     declined  {trip_start: when}   routes thrown away while route storage was
               off; "have routes" lists them so the car stops sending them
     snapshot  the latest snapshot (trimmed), feeds the sensors
+    runs      {when: row}   the timed runs kept (at most MAX_RUNS), and
+              runs_evicted {when: when dropped}: the runs the cap dropped,
+              which "have runs" lists so the car does not send them again
     """
 
     def __init__(
@@ -540,6 +561,8 @@ class ZoomyData:
         self.curves: dict[str, dict[str, Any]] = {}
         self.routes: dict[str, dict[str, Any]] = {}
         self.declined: dict[str, Any] = {}
+        self.runs: dict[str, dict[str, Any]] = {}
+        self.runs_evicted: dict[str, Any] = {}
         self.snapshot: dict[str, Any] | None = None
         self.snapshot_received: str | None = None
         self.app_version: str | None = None
@@ -559,6 +582,7 @@ class ZoomyData:
             "dyno": self._post_dyno,
             "charge_curve": self._post_curve,
             "route": self._post_route,
+            "runs": self._post_runs,
             "have": self._post_have,
         }
 
@@ -807,6 +831,65 @@ class ZoomyData:
         }
         return reply, {"save": ("curves",)}
 
+    # ----- timed runs -------------------------------------------------------------
+
+    def merge_runs(self, rows: Any, now: str) -> tuple[int, int, int]:
+        """Merge timed runs by "when"; return (stored, skipped, dropped by the cap)."""
+        if type(rows) is not list:
+            raise Refused("rows must be a list")
+        if len(rows) > MAX_ROWS:
+            raise Refused(f"too many rows in one post, the limit is {MAX_ROWS}")
+        stored = skipped = 0
+        for row in rows:
+            if isinstance(row, dict) and _key_ok(row.get("when")):
+                self.runs[row["when"]] = row
+                self.runs_evicted.pop(row["when"], None)
+                stored += 1
+            else:
+                skipped += 1
+        return stored, skipped, self.trim_runs(now)
+
+    def trim_runs(self, now: str | None = None) -> int:
+        """Keep at most MAX_RUNS runs, by the agreed rule; return how many went."""
+        extra = len(self.runs) - MAX_RUNS
+        if extra <= 0:
+            return 0
+        protected: set[str] = set()
+        for column in RUN_PROTECT_COLUMNS:
+            timed = sorted(
+                (_run_time(row, column), key)
+                for key, row in self.runs.items()
+                if _run_time(row, column) != math.inf
+            )
+            protected.update(key for _time, key in timed[:RUNS_PROTECTED])
+        # The slowest 0-60 first (none = slowest); among equals the oldest first.
+        others = sorted(
+            (key for key in self.runs if key not in protected),
+            key=lambda key: (-_run_time(self.runs[key], "s_0_60"), key),
+        )
+        gone = others[:extra]
+        stamp = now or utc_now_text()
+        for key in gone:
+            del self.runs[key]
+            self.runs_evicted[key] = stamp
+        if len(self.runs_evicted) > MAX_EVICTED:
+            for old in sorted(self.runs_evicted)[: len(self.runs_evicted) - MAX_EVICTED]:
+                del self.runs_evicted[old]
+        return len(gone)
+
+    def _post_runs(self, body: dict[str, Any], now: str) -> tuple:
+        """Handle a "runs" post."""
+        stored, skipped, dropped = self.merge_runs(body.get("rows"), now)
+        reply = {
+            "ok": True,
+            "kind": "runs",
+            "stored": stored,
+            "skipped": skipped,
+            "dropped": dropped,
+            "have": len(self.runs),
+        }
+        return reply, ({"save": ("runs",)} if stored or dropped else {})
+
     # ----- routes -----------------------------------------------------------------
 
     def check_route(self, body: dict[str, Any]) -> tuple[str, dict[str, Any]]:
@@ -964,9 +1047,11 @@ class ZoomyData:
         """
         name = HAVE_SETS.get(what) if isinstance(what, str) else None
         if name is None:
-            raise Refused("what must be trips, charges, charge_curves or routes")
+            raise Refused("what must be trips, charges, charge_curves, routes or runs")
         if name == "routes":
             return _newest_first(set(self.routes) | set(self.declined))
+        if name == "runs":
+            return _newest_first(set(self.runs) | set(self.runs_evicted))
         return _newest_first(getattr(self, name))
 
     def _post_have(self, body: dict[str, Any], now: str) -> tuple:
@@ -996,6 +1081,19 @@ class ZoomyData:
         if rows:
             return {"rows": rows, "source": "store"}
         snap = self.snapshot.get(kind) if isinstance(self.snapshot, dict) else None
+        if type(snap) is list:
+            return {"rows": [row for row in snap if isinstance(row, dict)], "source": "snapshot"}
+        return {"rows": [], "source": "store"}
+
+    def runs_view(self) -> dict[str, Any]:
+        """Return the timed runs for a page: {"rows", "source"}, newest first.
+
+        The runs kept ("store") when there are any; otherwise the runs of the
+        latest snapshot ("snapshot"), as for trips and charges.
+        """
+        if self.runs:
+            return {"rows": [self.runs[key] for key in _newest_first(self.runs)], "source": "store"}
+        snap = self.snapshot.get("runs") if isinstance(self.snapshot, dict) else None
         if type(snap) is list:
             return {"rows": [row for row in snap if isinstance(row, dict)], "source": "snapshot"}
         return {"rows": [], "source": "store"}
@@ -1049,6 +1147,7 @@ class ZoomyData:
             "dyno_pulls": len(self.dyno["pulls"]),
             "charge_curves": len(self.curves),
             "routes": len(self.routes),
+            "runs": len(self.runs),
         }
 
     def status(self) -> dict[str, Any]:
@@ -1082,6 +1181,8 @@ class ZoomyData:
                 "received": self.snapshot_received,
                 "version": self.app_version,
             }
+        if name == "runs":
+            return {"rows": self.runs, "evicted": self.runs_evicted}
         return getattr(self, name)
 
     def load(self, name: str, raw: Any) -> str | None:
@@ -1095,6 +1196,8 @@ class ZoomyData:
             raise KeyError(name)
         if name == "snapshot":
             return self._load_snapshot(raw)
+        if name == "runs":
+            return self._load_runs(raw)
         empty = self._empty_dyno() if name == "dyno" else {}
         if raw is None:
             setattr(self, name, empty)
@@ -1123,6 +1226,26 @@ class ZoomyData:
         version = raw.get("version")
         if isinstance(version, str) and 0 < len(version) <= MAX_VERSION_LEN:
             self.app_version = version
+        return None
+
+    def _load_runs(self, raw: Any) -> str | None:
+        """Take over the stored timed runs (and the keys the cap dropped)."""
+        self.runs, self.runs_evicted = {}, {}
+        if raw is None:
+            return "nothing stored yet, starting empty"
+        if not isinstance(raw, dict) or not isinstance(raw.get("rows"), dict):
+            return "stored data is not the expected shape, starting empty"
+        dropped = 0
+        for key, row in raw["rows"].items():
+            if _key_ok(key) and isinstance(row, dict) and row.get("when") == key:
+                self.runs[key] = row
+            else:
+                dropped += 1
+        evicted = raw.get("evicted")
+        if isinstance(evicted, dict):
+            self.runs_evicted = {key: value for key, value in evicted.items() if _key_ok(key)}
+        if dropped:
+            return f"{dropped} stored entries were not the expected shape and were dropped"
         return None
 
     @staticmethod

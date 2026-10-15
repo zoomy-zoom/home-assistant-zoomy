@@ -82,7 +82,12 @@ class FrontendFilesTest(unittest.TestCase):
     def test_data_only_from_zoomy_websocket_commands(self) -> None:
         text = "\n".join(self.files.values())
         asked = set(re.findall(r"\bask\('([a-z_]+)'", text))
-        self.assertEqual(asked, {"trips", "charges", "dyno", "snapshot", "curve_keys", "charge_curve", "route_keys", "route"})
+        self.assertEqual(asked, {"trips", "charges", "dyno", "runs", "snapshot", "curve_keys", "charge_curve", "route_keys", "route"})
+        # every command a page asks is one the integration answers
+        ws_path = os.path.join(os.path.dirname(FRONTEND), "websocket_api.py")
+        with open(ws_path, encoding="utf-8") as handle:
+            served = set(re.findall(r'"zoomy/([a-z_]+)"', handle.read()))
+        self.assertLessEqual(asked | {"cars", "status", "subscribe"}, served)
         self.assertIn("type: 'zoomy/' + type", self.files["core.js"])
         code = re.sub(COMMENT_RE, "", text)
         for word in ("zoomy_store", "history/", "device_tracker", "/local/", "/api/", "fetch(", "XMLHttpRequest", "WebSocket(", "callApi", "callService"):

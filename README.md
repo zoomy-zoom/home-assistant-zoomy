@@ -1,8 +1,8 @@
 # Zoomy for Home Assistant
 
 See your car's trips, charges, dyno runs, charge curves and trip routes in Home Assistant.
-The Zoomy app in the car sends them to Home Assistant over your home Wi-Fi. Nothing goes
-through the internet and nothing leaves your house.
+The Zoomy app in the car sends them straight to Home Assistant over your home Wi-Fi. Nothing
+goes through the internet, and everything stays on your Home Assistant.
 
 ## Install
 
@@ -21,7 +21,8 @@ Choose one of two ways:
 
 Each car gets its own device, called "Zoomy" and the car's name, with its sensors.
 Add as many cars as you like. If the Zoomy app ever makes a new webhook id, use
-**Reconfigure** on the car to paste the new one (or pair the car again).
+**Reconfigure** on the car to paste the new one (or pair the car again). The car keeps its
+history either way.
 
 ## What you get
 
@@ -61,18 +62,24 @@ Add as many cars as you like. If the Zoomy app ever makes a new webhook id, use
   **Delete the stored routes now** to remove the ones already kept.
 * The dashboard reads routes over Home Assistant's signed-in connection, one trip at a time, and keeps
   them only on the screen. It logs nothing and keeps nothing in the browser but the car you picked.
+  The map pictures under a route come from the same map service as Home Assistant's own maps, so
+  that service sees which area is on screen (as with any map in Home Assistant).
+* Anyone who may see the car's sensors in Home Assistant may also see its routes on the dashboard.
 * The webhook only answers the home network. The car posts plain HTTP on your Wi-Fi only.
 * **Download diagnostics** has no webhook id, car name, route, trip time or trip value in it.
 * Home Assistant's own web server writes webhook addresses to its log when debug logging
   is on for `homeassistant.components.webhook` or `homeassistant.components.http`, and
-  warns with the address when a device outside your network tries a webhook. Do not share
-  such logs.
+  warns with the address when a device outside your network tries a webhook. With debug
+  logging on for `homeassistant.components.websocket_api` it also writes every message it
+  sends to the browser, routes included. Do not share such logs.
 * Removing a car deletes everything stored for it, its routes too.
 
 ## Remove
 
-Delete the car under **Settings > Devices & services > Zoomy**. When the last car goes,
-the ZOOMY dashboard goes too (unless you changed it).
+1. Delete each car under **Settings > Devices & services > Zoomy**. This deletes everything
+   stored for it, its routes too. When the last car goes, the ZOOMY dashboard goes too
+   (unless you changed it).
+2. Then remove **Zoomy** in HACS and restart Home Assistant.
 
 ---
 
@@ -91,9 +98,15 @@ refused with 409) and `"format"` (a number; additive, only recorded).
 | `dyno` | `envelope`, `regen_envelope`, `best`, `sag` replaced; `pulls` merged by `when` | `{"ok": true, "kind": "dyno", "stored", "skipped", "have"}` |
 | `charge_curve` | `{"charge_start", "points": [[minutes, soc, kw], ...]}` | `{"ok": true, "kind": "charge_curve", "stored": 1, "n", "have"}` |
 | `route` | `{"trip_start", "trip_end", "km", "points": [[lat, lon], ...]}` | `{"ok": true, "kind": "route", "stored": 1, "n", "have"}`; with routes turned off `{"ok": true, "stored": 0, "discarded": 1, "store_routes": false, ...}` |
-| `have` | `{"what": "trips" \| "charges" \| "charge_curves" \| "routes"}` | `{"ok": true, "kind": "have", "what", "keys": [...]}` (routes add `"store_routes"`; with routes off the keys include the routes thrown away, so the car stops sending them) |
+| `runs` | `{"rows": [{"when", "s_0_60", "s_0_80", "s_0_100", "s_400m", "trap_kmh", "peak_g"}, ...]}`, key `when`, at most 1000 rows | `{"ok": true, "kind": "runs", "stored", "skipped", "dropped", "have"}` |
+| `have` | `{"what": "trips" \| "charges" \| "charge_curves" \| "routes" \| "runs"}` | `{"ok": true, "kind": "have", "what", "keys": [...]}` (routes add `"store_routes"`; with routes off the keys include the routes thrown away, so the car stops sending them; runs include the runs the cap dropped) |
 
-Refused: 400 / 409 / 413 / 500 with `{"ok": false, "error": "<under 120 characters>"}`.
+Timed runs: Home Assistant keeps 500, by the same rule as the car: the best 125 by `s_0_60`,
+the best 125 by `s_0_100` and the best 125 by `s_400m` always stay (a missing time does not
+count); of the others the slowest `s_0_60` goes first (none = slowest), the oldest first among equals.
+
+Refused: 400 / 409 / 413 / 500 with `{"ok": false, "error": "<under 120 characters>"}`;
+503 while the car's entry is being reloaded or removed (try again on the next pass).
 An **empty 200** means the post did not reach Zoomy (unknown webhook id, or a sender outside
 the home network). Limits: body 2 MB, nesting 32 levels, keys 200 characters, 2000 points
 per curve or pull, 60,000 route points.
@@ -122,6 +135,7 @@ takes an optional `entry_id` (required when there are two or more cars).
 | `zoomy/snapshot` | `{"snapshot", "received"}` (runs, health, drain, ...) |
 | `zoomy/trips`, `zoomy/charges` | `{"rows": [...], "source": "store" \| "snapshot"}` newest first |
 | `zoomy/dyno` | `{envelope, regen_envelope, best, sag, pulls}` |
+| `zoomy/runs` | `{"rows": [...], "source": "store" \| "snapshot"}` timed runs, newest first |
 | `zoomy/curve_keys`, `zoomy/charge_curve` (`charge_start`) | the stored charge curves |
 | `zoomy/route_keys`, `zoomy/route` (`trip_start`) | route list (no coordinates); one route's points |
 | `zoomy/subscribe` | an event `{entry_id, changed, counts}` after each post that changed something |
@@ -153,7 +167,7 @@ Tests: `pip install -r requirements_test.txt` in a virtual environment, then `py
 Frontend tests (Node 20 or later; the browser tests need Chrome or Chromium, always run headless with a fresh profile):
 
 * `node --test tests/frontend/unit.test.mjs`
-* `node tests/frontend/run.js` (cases and layout; add `shots` for screenshots in `tests/frontend/shots/`)
+* `node tests/frontend/run.js` (cases and layout; add `shots` for screenshots in `tests/frontend/shots/`; `ZOOMY_CASES=hostile,privacy` runs only those cases)
 
 ### Home Assistant APIs this relies on (checked against 2026.10.0)
 

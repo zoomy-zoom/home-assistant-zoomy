@@ -103,7 +103,7 @@ async def test_pairing(hass: HomeAssistant, hass_client_no_auth) -> None:
     assert PAIR_WEBHOOK_ID in hass.data[webhook.DOMAIN]
     assert hass.data[webhook.DOMAIN][PAIR_WEBHOOK_ID].local_only is True
 
-    status, text = await pair_post(hass_client_no_auth, offer(name="Blue MG4", version="4.19.0"))
+    status, text = await pair_post(hass_client_no_auth, offer(name="Blue car", version="4.19.0"))
     assert status == 200
     assert json.loads(text) == {"ok": True, "kind": "pair", "status": "waiting", "expires_in": 600}
     status, text = await pair_post(hass_client_no_auth, offer(code=123456))
@@ -115,8 +115,8 @@ async def test_pairing(hass: HomeAssistant, hass_client_no_auth) -> None:
     assert result["errors"] == {"code": "code_not_found"}
     result = await hass.config_entries.flow.async_configure(result["flow_id"], {"code": "123 456"})
     assert result["type"] is FlowResultType.CREATE_ENTRY
-    assert result["title"] == "Blue MG4"
-    assert result["data"] == {CONF_WEBHOOK_ID: CAR_WEBHOOK, CONF_CAR_ID: "car-A1", "car_name": "Blue MG4"}
+    assert result["title"] == "Blue car"
+    assert result["data"] == {CONF_WEBHOOK_ID: CAR_WEBHOOK, CONF_CAR_ID: "car-A1", "car_name": "Blue car"}
     assert result["result"].unique_id == "car-A1"
     await hass.async_block_till_done()
     # pairing is over: the pairing webhook is gone, the car's own one is there

@@ -38,14 +38,14 @@ class TestOffers(Base):
 
     def test_offer_then_claim(self):
         self.book.flow_waiting("flow1")
-        status, reply = self.book.offer(body(name="  MG4 \n Long Range  ", version="4.19.0"), "192.0.2.10")
+        status, reply = self.book.offer(body(name="  Test \n Long Range  ", version="4.19.0"), "192.0.2.10")
         self.assertEqual(status, 200)
         self.assertEqual(reply, {"ok": True, "kind": "pair", "status": "waiting", "expires_in": 600})
         self.assertNotIn(GOOD_ID, str(reply))  # never echoed
         self.assertIsNone(self.book.claim("654321"))
         offer = self.book.claim("123456")
         self.assertEqual((offer.car_id, offer.webhook_id, offer.name, offer.version),
-                         ("car-1", GOOD_ID, "MG4 Long Range", "4.19.0"))
+                         ("car-1", GOOD_ID, "Test Long Range", "4.19.0"))
         self.assertIsNone(self.book.claim("123456"))  # used up
 
     def test_offers_expire(self):

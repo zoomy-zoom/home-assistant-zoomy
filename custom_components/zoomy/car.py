@@ -103,6 +103,11 @@ class ZoomyCar:
         # One post is handled at a time, so two posts cannot interleave.
         self.lock = asyncio.Lock()
         self.device_id: str | None = None
+        # Set by async_flush (unload, reload, removal): from then on posts are
+        # answered "try again" and nothing more is written, so a post that
+        # comes in while the entry goes cannot be saved after the last write
+        # (a reload would lose it; a removal would leave its files behind).
+        self.closed = False
         self._pending: set[str] = set()
         self._listeners: list[Callable[[frozenset[str]], None]] = []
         # One .storage file per set, readable by the Home Assistant user only.
@@ -172,8 +177,13 @@ class ZoomyCar:
         self._update_values()
 
     async def async_flush(self) -> None:
-        """Write every set with a pending change now (at unload / reload)."""
+        """Write every set with a pending change now and take no more posts.
+
+        Called when the entry is unloaded (reload, removal).  The lock is
+        taken, so a post being handled is finished and written first.
+        """
         async with self.lock:
+            self.closed = True
             for name in list(self._pending):
                 await self._stores[name].async_save(self.data.dump(name))
             self._pending.clear()
@@ -211,6 +221,8 @@ class ZoomyCar:
     @callback
     def _schedule_save(self, name: str) -> None:
         """Write one set to .storage a few seconds from now."""
+        if self.closed:
+            return  # the entry is going: its last write is done
         self._pending.add(name)
         self._stores[name].async_delay_save(partial(self._dump_for_save, name), SAVE_DELAY)
 
@@ -258,6 +270,10 @@ class ZoomyCar:
         """Handle one post body (the lock is held)."""
         now = dt_util.utcnow().isoformat(timespec="seconds")
         changed: set[str] = set()
+        if self.closed:
+            # The entry is being reloaded or removed; the car tries again on
+            # its next pass (a JSON reply that is not "ok" ends this one).
+            return 503, logic.error_reply("Zoomy is restarting in Home Assistant, try again later")
         try:
             body = logic.decode_body(raw, json_loads)
         except logic.Refused as err:
